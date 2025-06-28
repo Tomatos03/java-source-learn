@@ -62,6 +62,25 @@ public interface Consumer<T> {
      */
     default Consumer<T> andThen(Consumer<? super T> after) {
         Objects.requireNonNull(after);
-        return (T t) -> { accept(t); after.accept(t); };
+        return (T t) -> {
+            accept(t);
+            after.accept(t);
+        };
     }
+    /**
+     * Example usage:
+     * <pre>{@code
+     * Consumer<String> consumer0 = System.out::println;
+     * Consumer<String> consumer1 = (str) -> {
+     *     System.out.printf("[Second]: %s\n", str);
+     * };
+     * Consumer<String> consumer2 = consumer0.andThen(consumer1);
+     * consumer2.accept("Hello, World!");
+     * }</pre>
+     * Output:
+     * <pre>
+     * Hello, World!
+     * [Second]: Hello, World!
+     * </pre>
+     */
 }
