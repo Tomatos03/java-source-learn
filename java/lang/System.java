@@ -490,6 +490,21 @@ public final class System {
      * @exception  NullPointerException if either <code>src</code> or
      *               <code>dest</code> is <code>null</code>.
      */
+
+     /**
+      * Example Code：
+      * <pre>
+      * Integer[] arr = {1, 2, 3, 4};
+      * Integer[] arr0 = {5, 6, 7, 8};
+      * System.arraycopy(arr, 2, arr0, 1, 2);
+      * for (Integer i : arr0) {
+      *     System.out.print(i + " ");
+      * }
+      * </pre>
+      *
+      * Output:
+      * 5 3 4 8
+      */
     public static native void arraycopy(Object src,  int  srcPos,
                                         Object dest, int destPos,
                                         int length);
