@@ -103,6 +103,12 @@ import java.util.function.UnaryOperator;
  * @since   1.2
  */
 
+/**
+ * 请你介绍一下ArrayList
+ * 在Java8中 ArrayList维护了一个数组，这个数组能够动态扩展. 在创建ArrayList时如果没有指定具体的容量, 默认情况下初始容量为10,
+ * 在进行添加相关操作的时候才进行对象的创建. 每次进行添加操作会先确定当前数组的容量是否满足需要的最小容量, 如果容量不足, 数组容量大小扩充到原来的3/2
+ * 扩容之后仍无法满足最小容量需求, 就使用最小容量当成当前的容量
+ */
 public class ArrayList<E> extends AbstractList<E>
         implements List<E>, RandomAccess, Cloneable, java.io.Serializable
 {
@@ -206,6 +212,9 @@ public class ArrayList<E> extends AbstractList<E>
      *
      * @param   minCapacity   the desired minimum capacity
      */
+    // 该方法内部并没有调用, 提供给外部使用者调用
+    // 如果确定添加元素的数量, 并且添加的元素数量远远多于当前容量, 需要添加的次数也很多
+    // 可以使用这个方法来预先分配空间(最多动态增长当前数组容量一次), 减少扩容的次数
     public void ensureCapacity(int minCapacity) {
         int minExpand = (elementData != DEFAULTCAPACITY_EMPTY_ELEMENTDATA)
             // any size if not default element table
@@ -220,6 +229,9 @@ public class ArrayList<E> extends AbstractList<E>
     }
 
     private void ensureCapacityInternal(int minCapacity) {
+        // 仅在没有指定初始容量,第一次进行添加操作的时执行
+        // 对于初始化的时候没有确定容量的ArrayList, 会引用同一个静态常量DEFAULTCAPACITY_EMPTY_ELEMENTDATA
+        // 只有在首次添加元素时才会分配空间
         if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
             minCapacity = Math.max(DEFAULT_CAPACITY, minCapacity);
         }
@@ -231,7 +243,7 @@ public class ArrayList<E> extends AbstractList<E>
         modCount++;
 
         // overflow-conscious code
-        if (minCapacity - elementData.length > 0)
+        if (minCapacity - elementData.length > 0) // 当前需要的容量 > 数组容量
             grow(minCapacity);
     }
 
@@ -252,16 +264,21 @@ public class ArrayList<E> extends AbstractList<E>
     private void grow(int minCapacity) {
         // overflow-conscious code
         int oldCapacity = elementData.length;
+        // 新容量 = 3/2 * 容量
         int newCapacity = oldCapacity + (oldCapacity >> 1);
+        // 新容量 < 需要的最小容量
         if (newCapacity - minCapacity < 0)
             newCapacity = minCapacity;
+        // 新容量 > 数组的最大扩容容量
         if (newCapacity - MAX_ARRAY_SIZE > 0)
             newCapacity = hugeCapacity(minCapacity);
         // minCapacity is usually close to size, so this is a win:
+        // 拷贝原数组的数据到新数组
         elementData = Arrays.copyOf(elementData, newCapacity);
     }
 
     private static int hugeCapacity(int minCapacity) {
+        // minCapacity 可能超过INT_MAX变成负数
         if (minCapacity < 0) // overflow
             throw new OutOfMemoryError();
         return (minCapacity > MAX_ARRAY_SIZE) ?
@@ -349,6 +366,8 @@ public class ArrayList<E> extends AbstractList<E>
     public Object clone() {
         try {
             ArrayList<?> v = (ArrayList<?>) super.clone();
+            // this.elementData  → [引用1, 引用2, 引用3]  原数组
+            // v                 → [引用1, 引用2, 引用3]  新数组（引用值相同，但数组对象不同）
             v.elementData = Arrays.copyOf(elementData, size);
             v.modCount = 0;
             return v;
@@ -406,8 +425,27 @@ public class ArrayList<E> extends AbstractList<E>
             // Make a new array of a's runtime type, but my contents:
             return (T[]) Arrays.copyOf(elementData, size, a.getClass());
         System.arraycopy(elementData, 0, a, 0, size);
+        /**
+         *
+         * 示例：
+         * <pre>
+         * ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;();
+         * list.add("A");
+         * list.add("B");
+         *
+         * String[] array = new String[4];
+         * array[2] = "旧数据";
+         * array[3] = "旧数据";
+         *
+         * list.toArray(array);
+         *
+         * // 输出结果：
+         * // array = ["A", "B", null, "旧数据"]
+         * // 注意：array[2] 被设置为 null，array[3] 未被修改
+         * </pre>
+         */
         if (a.length > size)
-            a[size] = null;
+            a[size] = null; // 标记新数组的边界
         return a;
     }
 
@@ -426,7 +464,7 @@ public class ArrayList<E> extends AbstractList<E>
      * @throws IndexOutOfBoundsException {@inheritDoc}
      */
     public E get(int index) {
-        rangeCheck(index);
+        rangeCheck(index); // 不显式检查是否为负数, 而是交给JVM处理
 
         return elementData(index);
     }
@@ -494,8 +532,10 @@ public class ArrayList<E> extends AbstractList<E>
         modCount++;
         E oldValue = elementData(index);
 
-        int numMoved = size - index - 1;
+        int numMoved = size - index - 1; // [index + 1, n) 之间的元素数量
         if (numMoved > 0)
+            // [1, .., Index    , Index + 1, .., n - 2, n - 1]
+            // [1, .., Index + 1, Index + 2, .., n - 1, n - 1]
             System.arraycopy(elementData, index+1, elementData, index,
                              numMoved);
         elementData[--size] = null; // clear to let GC do its work
@@ -604,12 +644,11 @@ public class ArrayList<E> extends AbstractList<E>
         int numNew = a.length;
         ensureCapacityInternal(size + numNew);  // Increments modCount
 
-        int numMoved = size - index;
+        int numMoved = size - index; // [index, size) 之间的元素数量
         if (numMoved > 0)
-            System.arraycopy(elementData, index, elementData, index + numNew,
+            System.arraycopy(elementData, index, elementData, index + numNew, // [index, size) 之间的元素向后移动 numNew 个位置
                              numMoved);
-
-        System.arraycopy(a, 0, elementData, index, numNew);
+        System.arraycopy(a, 0, elementData, index, numNew); // 将新数组的元素填充[index, index + numNew)
         size += numNew;
         return numNew != 0;
     }
@@ -840,7 +879,7 @@ public class ArrayList<E> extends AbstractList<E>
     private class Itr implements Iterator<E> {
         int cursor;       // index of next element to return
         int lastRet = -1; // index of last element returned; -1 if no such
-        int expectedModCount = modCount;
+        int expectedModCount = modCount; // 在获取到Iterator对象之后, 如果后续需要调用Iterator之中的方法, 不允许执行任何修改操作
 
         public boolean hasNext() {
             return cursor != size;
@@ -853,6 +892,26 @@ public class ArrayList<E> extends AbstractList<E>
             if (i >= size)
                 throw new NoSuchElementException();
             Object[] elementData = ArrayList.this.elementData;
+            /**
+             * 为什么需要检查 i >= elementData.length?
+             * 下面是一个通过反射修改 elementData 长度，导致 ConcurrentModificationException 的示例：
+             * <pre>
+             *     ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;();
+             *     list.add("a");
+             *     list.add("b");
+             *     list.add("c");
+             *
+             *     // 反射把 elementData 换成更短的数组
+             *     Field field = ArrayList.class.getDeclaredField("elementData");
+             *     field.setAccessible(true);
+             *     field.set(list, new Object[2]); // 只剩2个空间
+             *
+             *     Iterator&lt;String&gt; it = list.iterator();
+             *     it.next(); // 正常
+             *     it.next(); // 正常
+             *     it.next(); // 这里 i=2, elementData.length=2，触发 ConcurrentModificationException
+             * </pre>
+             */
             if (i >= elementData.length)
                 throw new ConcurrentModificationException();
             cursor = i + 1;
@@ -865,7 +924,7 @@ public class ArrayList<E> extends AbstractList<E>
             checkForComodification();
 
             try {
-                ArrayList.this.remove(lastRet);
+                ArrayList.this.remove(lastRet); // modCount改变
                 cursor = lastRet;
                 lastRet = -1;
                 expectedModCount = modCount;
@@ -887,12 +946,14 @@ public class ArrayList<E> extends AbstractList<E>
             if (i >= elementData.length) {
                 throw new ConcurrentModificationException();
             }
+            //遍历的过程不允许修改操作(modCount不允许变化)
             while (i != size && modCount == expectedModCount) {
                 consumer.accept((E) elementData[i++]);
             }
             // update once at end of iteration to reduce heap write traffic
             cursor = i;
             lastRet = i - 1;
+            // 遍历完成, 但方法没有执行完成时也不允许修改操作
             checkForComodification();
         }
 
