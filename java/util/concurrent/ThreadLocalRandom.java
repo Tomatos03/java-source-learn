@@ -79,6 +79,13 @@ import java.util.stream.StreamSupport;
  * @since 1.7
  * @author Doug Lea
  */
+ /**
+  * ThreadLocalRandom的原理类似于ThreadLocal.
+  * 让每个线程都持有一个本地的种子变量，该种子变量只有在使用随机数时才会被
+  * 初始化 。在多线程 下计算新种子时是根据自己线程内维护的种子变量进行更新，
+  * 从而避免了竞争。
+  *
+  */
 public class ThreadLocalRandom extends Random {
     /*
      * This class implements the java.util.Random API (and subclasses
@@ -195,6 +202,7 @@ public class ThreadLocalRandom extends Random {
     }
 
     /** The common ThreadLocalRandom */
+    // 多个线程尝试调用current方法获取到的是同一个ThreadLocalRandom对象
     static final ThreadLocalRandom instance = new ThreadLocalRandom();
 
     /**
@@ -204,13 +212,14 @@ public class ThreadLocalRandom extends Random {
      * though the initialization is purely thread-local, we need to
      * rely on (static) atomic generators to initialize the values.
      */
+     // 初始化当前线程的随机数种子
     static final void localInit() {
         int p = probeGenerator.addAndGet(PROBE_INCREMENT);
         int probe = (p == 0) ? 1 : p; // skip 0
         long seed = mix64(seeder.getAndAdd(SEEDER_INCREMENT));
         Thread t = Thread.currentThread();
-        UNSAFE.putLong(t, SEED, seed);
-        UNSAFE.putInt(t, PROBE, probe);
+        UNSAFE.putLong(t, SEED, seed); // 初始化Thread中的 threadLocalRandomSeed(long)
+        UNSAFE.putInt(t, PROBE, probe); // 初始化Thread中的 threadLocalRandomProbe(long)
     }
 
     /**
@@ -218,10 +227,12 @@ public class ThreadLocalRandom extends Random {
      *
      * @return the current thread's {@code ThreadLocalRandom}
      */
+    // localInit()会初始化随机数种子, 这里实现了懒加载机制, 仅在使用的时候才创建随机数种子
     public static ThreadLocalRandom current() {
+        // 这里UNSAFE.getint() 按照读取int的方式读取Thread实例指定偏移量上的值
         if (UNSAFE.getInt(Thread.currentThread(), PROBE) == 0)
-            localInit();
-        return instance;
+            localInit(); // 该方法被执行表示Thread类中的属性threadLocalRandomProbe没有被初始化
+        return instance; // ThreadLocalRandom
     }
 
     /**
@@ -1059,6 +1070,7 @@ public class ThreadLocalRandom extends Random {
         try {
             UNSAFE = sun.misc.Unsafe.getUnsafe();
             Class<?> tk = Thread.class;
+            // 获取Thread类中定义的threadLocalRandomSeed在Thread实例中的偏移量
             SEED = UNSAFE.objectFieldOffset
                 (tk.getDeclaredField("threadLocalRandomSeed"));
             PROBE = UNSAFE.objectFieldOffset
