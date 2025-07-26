@@ -201,6 +201,8 @@ class Random implements java.io.Serializable {
         do {
             oldseed = seed.get();
             nextseed = (oldseed * multiplier + addend) & mask;
+            // CAS操作保证原子性
+            // 如果存在多个线程执行到这里, 除了成功进行CAS操作的那个线程, 其他线程都会自旋重试, 降低并发性能
         } while (!seed.compareAndSet(oldseed, nextseed));
         return (int)(nextseed >>> (48 - bits));
     }
@@ -384,10 +386,13 @@ class Random implements java.io.Serializable {
      * @since 1.2
      */
     public int nextInt(int bound) {
+        // 检查随机数边界是否合法
         if (bound <= 0)
             throw new IllegalArgumentException(BadBound);
 
+        // 根据老种子生成新种子
         int r = next(31);
+        // 根据算法生成新的随机数
         int m = bound - 1;
         if ((bound & m) == 0)  // i.e., bound is a power of 2
             r = (int)((bound * (long)r) >> 31);
