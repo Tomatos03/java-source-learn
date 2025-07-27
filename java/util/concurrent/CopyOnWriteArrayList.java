@@ -88,11 +88,30 @@ import java.util.function.UnaryOperator;
  * @author Doug Lea
  * @param <E> the type of elements held in this collection
  */
+
+ /**
+  * CopyOnWrite 策略:
+  * 在进行写入相关操作的时候, 先创建对象副本, 在新的对象副本上操作, 再使用副本覆盖原来的对象
+  *
+  * 对于 CopyOnWriteArrayList 提出以下问题
+  *
+  * 1. 如何保证迭代器遍历数据时的数据一致性
+  *
+  * 答: CopyOnWriteArrayList实现的迭代器并不具有强一致性,
+  * 想要保证数据一致性,在进行迭代器操作的时, 不要进行写操作
+  *
+  *
+  * 2. 如何保证线程安全
+  *
+  * 答: 在进行添加操作的时候添加独占锁, 保证同一时刻只有一个线程能够操作资源
+  *
+  */
 public class CopyOnWriteArrayList<E>
     implements List<E>, RandomAccess, Cloneable, java.io.Serializable {
     private static final long serialVersionUID = 8673264195747942595L;
 
     /** The lock protecting all mutators */
+    // Java 提供的独占锁, 保证同一个时刻只有一个线程能够操作资源
     final transient ReentrantLock lock = new ReentrantLock();
 
     /** The array, accessed only via getArray/setArray. */
@@ -128,6 +147,8 @@ public class CopyOnWriteArrayList<E>
      * @param c the collection of initially held elements
      * @throws NullPointerException if the specified collection is null
      */
+    // 如果传入的集合对象是一个CopyOnWriteArrayList, 那么就直接获取传入对象的array赋值到当前对象的array
+    // 否则先将集合转化为Object数组在赋值
     public CopyOnWriteArrayList(Collection<? extends E> c) {
         Object[] elements;
         if (c.getClass() == CopyOnWriteArrayList.class)
@@ -135,6 +156,7 @@ public class CopyOnWriteArrayList<E>
         else {
             elements = c.toArray();
             // c.toArray might (incorrectly) not return Object[] (see 6260652)
+            // 不同集合实现toArray()方法可能存在一些差异, 显示的判断防止错误发生
             if (elements.getClass() != Object[].class)
                 elements = Arrays.copyOf(elements, elements.length, Object[].class);
         }
@@ -148,6 +170,7 @@ public class CopyOnWriteArrayList<E>
      *        internal array)
      * @throws NullPointerException if the specified array is null
      */
+     // 传入对象数组和当前维护的array是同一个类型的数组, 调用copyOf直接拷贝
     public CopyOnWriteArrayList(E[] toCopyIn) {
         setArray(Arrays.copyOf(toCopyIn, toCopyIn.length, Object[].class));
     }
@@ -381,7 +404,10 @@ public class CopyOnWriteArrayList<E>
     }
 
     // Positional Access Operations
-
+    // 存在弱一致性问题, 例子:
+    // 假设此时array = [1, 2, 3]
+    // 1. x, y 两个线程同时读取到array
+    // 2. y线程进行了 remove 操作(操作完成后会得到新副本), array = [1, 2] (此时x中的array = [1, 2, 3])
     @SuppressWarnings("unchecked")
     private E get(Object[] a, int index) {
         return (E) a[index];
@@ -430,6 +456,7 @@ public class CopyOnWriteArrayList<E>
      * @param e element to be appended to this list
      * @return {@code true} (as specified by {@link Collection#add})
      */
+    // 添加之前获取独占锁, 拷贝原数组array到新数组(数组长度比原来长1), 然后在赋值, 最后释放锁
     public boolean add(E e) {
         final ReentrantLock lock = this.lock;
         lock.lock();
@@ -491,7 +518,9 @@ public class CopyOnWriteArrayList<E>
         try {
             Object[] elements = getArray();
             int len = elements.length;
+            // 尽管get() 方法没有加锁, 但是当前方法获取的独占锁, 保证在释放锁之前没有任何写操作
             E oldValue = get(elements, index);
+            // 索引在[index + 1, len - 1]的元素需要移动, index = len - 1表示没有任何元素需要移动
             int numMoved = len - index - 1;
             if (numMoved == 0)
                 setArray(Arrays.copyOf(elements, len - 1));
@@ -1126,6 +1155,12 @@ public class CopyOnWriteArrayList<E>
             (getArray(), Spliterator.IMMUTABLE | Spliterator.ORDERED);
     }
 
+    /**
+     *
+     * 存在弱一致性问题:
+     * 在获取了该迭代器之后, 如果进行了相关写操作, 就会造成数据不一致,
+     *
+     */
     static final class COWIterator<E> implements ListIterator<E> {
         /** Snapshot of the array */
         private final Object[] snapshot;
