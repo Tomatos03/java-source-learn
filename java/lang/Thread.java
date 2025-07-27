@@ -2027,7 +2027,7 @@ class Thread implements Runnable {
 
     /** Probe hash value; nonzero if threadLocalRandomSeed initialized */
     @sun.misc.Contended("tlr")
-    int threadLocalRandomProbe;
+    int threadLocalRandomProbe; // 当前线程的探针值, 代表当前线程的"身份"或"哈希值"
 
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     @sun.misc.Contended("tlr")
