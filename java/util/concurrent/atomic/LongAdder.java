@@ -81,14 +81,28 @@ public class LongAdder extends Striped64 implements Serializable {
      *
      * @param x the value to add
      */
+    // 在一次进行添加操作的时候去初始化Cell数组
+    // add是调用Unsafe的CAS操作,每次CAS操作只有一个线程能成功更新base或Cell
     public void add(long x) {
         Cell[] as; long b, v; int m; Cell a;
+        // casBase()方法封装了Unsafe的CAS操作
         if ((as = cells) != null || !casBase(b = base, b + x)) {
-            boolean uncontended = true;
+            // Cell[] 为null 或 CAS操作失败时执行
+            boolean uncontended = true; // uncontended = false 说明多个线程在竞争
             if (as == null || (m = as.length - 1) < 0 ||
                 (a = as[getProbe() & m]) == null ||
                 !(uncontended = a.cas(v = a.value, v + x)))
-                longAccumulate(x, null, uncontended);
+            /**
+             * longAccumulate方法被执行有以下情况(从上至下):
+             * 1. Cell[] 数组没有被创建
+             * 2. Cell[] 数组创建但没有任何元素
+             * 3. getProbe() & m 计算出来的新位置上不为null
+             * 4. 在getProbe() & m这个位置上的Cell执行CAS操作失败
+             *
+             * getProbe() & m -> 当前线程应该访问Cell数组的那一个Cell
+             * a.cas() -> 保证了多个线程操作被分配到的Cell的原子性
+             */
+                longAccumulate(x, null, uncontended); // 方法从Striped64类继承
         }
     }
 
@@ -115,6 +129,7 @@ public class LongAdder extends Striped64 implements Serializable {
      *
      * @return the sum
      */
+    // 累加base 和 Cell[] 中的所有的Cell的value
     public long sum() {
         Cell[] as = cells; Cell a;
         long sum = base;
@@ -134,6 +149,7 @@ public class LongAdder extends Striped64 implements Serializable {
      * method is intrinsically racy, it should only be used when it is
      * known that no threads are concurrently updating.
      */
+    // 设置base = 0, 以及Cell[] 数组中所有Cell的value = 0
     public void reset() {
         Cell[] as = cells; Cell a;
         base = 0L;
@@ -155,6 +171,8 @@ public class LongAdder extends Striped64 implements Serializable {
      *
      * @return the sum
      */
+    // 结合sum()和reset()方法
+    // 累加base和Cell[]中所有的value, 累加过程中将base和Cell[]数组中所有的value置为0
     public long sumThenReset() {
         Cell[] as = cells; Cell a;
         long sum = base;
