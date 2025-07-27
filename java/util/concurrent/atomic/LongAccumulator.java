@@ -110,6 +110,7 @@ public class LongAccumulator extends Striped64 implements Serializable {
                 !(uncontended =
                   (r = function.applyAsLong(v = a.value, x)) == v ||
                   a.cas(v, r)))
+                // 与LongAdder不同的是, 这里的cas操作expect值由传入的函数方法计算
                 longAccumulate(x, function, uncontended);
         }
     }
