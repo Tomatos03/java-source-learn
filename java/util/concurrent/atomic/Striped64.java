@@ -117,6 +117,7 @@ abstract class Striped64 extends Number {
      * JVM intrinsics note: It would be possible to use a release-only
      * form of CAS here, if it were provided.
      */
+    // 使用@Contented注解防止Cell数组中多个元素被放入同一个Cache块, 发生伪共享
     @sun.misc.Contended static final class Cell {
         volatile long value;
         Cell(long x) { value = x; }
@@ -156,6 +157,9 @@ abstract class Striped64 extends Number {
     /**
      * Spinlock (locked via CAS) used when resizing and/or creating Cells.
      */
+     // 值为0: 表示当前 cells 数组没有被初始化、扩容，也没有在新建 Cell 元素，即处于空闲状态。
+     // 值为1: 表示当前 cells 数组正在被初始化、扩容，或者正在创建新的 Cell 元素，即处于忙碌状态。
+     // 这个变量值的改变总是通过调用casCellsBusy()方法(CAS操作), 防止了竞态
     transient volatile int cellsBusy;
 
     /**
@@ -215,6 +219,9 @@ abstract class Striped64 extends Number {
                               boolean wasUncontended) {
         int h;
         if ((h = getProbe()) == 0) {
+            // ThreadLocalRandom 的随机数种子存放在Thread中, 名为threadLocalRandomSeed(long类型)
+            // threadLocalRandomSeed在ThreadLocalRandom.current()的方法被调用后初始化
+            // threadLocalRandomSeed被初始化后threadLocalRandomProbe(int类型)也被初始化
             ThreadLocalRandom.current(); // force initialization
             h = getProbe();
             wasUncontended = true;
@@ -255,11 +262,14 @@ abstract class Striped64 extends Number {
                     collide = false;            // At max size or stale
                 else if (!collide)
                     collide = true;
+                // 有冲突(多个线程访问了同一个Cell) 且Cell元素数量小于CPU数量进行扩容
+                // 为什么Cell个数需要小于CPU个数?
+                // 只有当每个 CPU(这里指处理核心数) 都运行一个线程时才会使多线程的效果最佳，也就是当cells数组元素个数与CPU个数一致时，每个Cell都使用一个CPU进行处理，这时性能才是最佳的
                 else if (cellsBusy == 0 && casCellsBusy()) {
                     try {
                         if (cells == as) {      // Expand table unless stale
-                            Cell[] rs = new Cell[n << 1];
-                            for (int i = 0; i < n; ++i)
+                            Cell[] rs = new Cell[n << 1]; // 新的Cell数组扩充为原来的2倍
+                            for (int i = 0; i < n; ++i) // 拷贝旧Cell数组之中的数
                                 rs[i] = as[i];
                             cells = rs;
                         }
@@ -269,6 +279,7 @@ abstract class Striped64 extends Number {
                     collide = false;
                     continue;                   // Retry with expanded table
                 }
+                // 为了能够找到一个空闲的 Cell, 重新计算hash值(即重新计算threadRandomProb), xorshift算法生成随机数
                 h = advanceProbe(h);
             }
             else if (cellsBusy == 0 && cells == as && casCellsBusy()) {
