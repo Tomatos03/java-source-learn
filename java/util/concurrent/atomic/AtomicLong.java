@@ -51,12 +51,16 @@ import sun.misc.Unsafe;
  * @since 1.5
  * @author Doug Lea
  */
+ /**
+  * AtomicLong 改变数值调用了Unsafe, Unsafe提供了CAS操作, 保证了操作的原子性.
+  *
+  */
 public class AtomicLong extends Number implements java.io.Serializable {
     private static final long serialVersionUID = 1927816293512124184L;
 
     // setup to use Unsafe.compareAndSwapLong for updates
     private static final Unsafe unsafe = Unsafe.getUnsafe();
-    private static final long valueOffset;
+    private static final long valueOffset; // 记录value在对象占用的内存中的偏移量
 
     /**
      * Records whether the underlying JVM supports lockless
@@ -64,6 +68,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
      * method works in either case, some constructions should be
      * handled at Java level to avoid locking user-visible locks.
      */
+    // 判断 JVM 是否支持long类型的无锁CAS
     static final boolean VM_SUPPORTS_LONG_CAS = VMSupportsCS8();
 
     /**
