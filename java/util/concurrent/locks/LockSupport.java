@@ -118,6 +118,7 @@ import sun.misc.Unsafe;
  * }}</pre>
  */
 public class LockSupport {
+
     private LockSupport() {} // Cannot be instantiated.
 
     private static void setBlocker(Thread t, Object arg) {
@@ -169,6 +170,8 @@ public class LockSupport {
      *        thread parking
      * @since 1.6
      */
+    // 将blocker存放到线程成员变量中去.
+    // 通常设置blocker为this方便jstack工具观察线程在那个类被阻塞
     public static void park(Object blocker) {
         Thread t = Thread.currentThread();
         setBlocker(t, blocker);
@@ -300,6 +303,8 @@ public class LockSupport {
      * the thread to park in the first place. Callers may also determine,
      * for example, the interrupt status of the thread upon return.
      */
+    // LockSupport 类与每个使用它的线程都会关联一个“许可证”。默认情况下，线程在调用 LockSupport 的方法时并不持有许可证
+    // 调用park方法的线程会阻塞, 直到有其他线程调用unpork()方法
     public static void park() {
         UNSAFE.park(false, 0L);
     }
@@ -333,9 +338,9 @@ public class LockSupport {
      *
      * @param nanos the maximum number of nanoseconds to wait
      */
+    // 与park方法类似, 但是不会一直阻塞调用的线程, 当过了nanos之后返回
     public static void parkNanos(long nanos) {
-        if (nanos > 0)
-            UNSAFE.park(false, nanos);
+        if (nanos > 0) UNSAFE.park(false, nanos);
     }
 
     /**
@@ -368,6 +373,7 @@ public class LockSupport {
      * @param deadline the absolute time, in milliseconds from the Epoch,
      *        to wait until
      */
+    // 与park方法类似, 当时间到deadline(即相对1970_01_01计算的时间戳)那个时间点返回
     public static void parkUntil(long deadline) {
         UNSAFE.park(true, deadline);
     }
