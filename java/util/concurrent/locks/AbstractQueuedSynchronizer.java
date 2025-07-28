@@ -286,6 +286,11 @@ import sun.misc.Unsafe;
  * @since 1.5
  * @author Doug Lea
  */
+/**
+ * AbstractQueuedSynchronizer的结构是怎么样的?
+ * 维护了一个以节点构成的双向队列
+ *
+ */
 public abstract class AbstractQueuedSynchronizer
     extends AbstractOwnableSynchronizer
     implements java.io.Serializable {
@@ -378,6 +383,18 @@ public abstract class AbstractQueuedSynchronizer
      * on the design of this class.
      */
     static final class Node {
+
+        /**
+         * SHARED：表示线程以共享模式在AQS队列中等待资源。
+         * EXCLUSIVE：表示线程以独占模式在AQS队列中等待资源。
+         *
+         * waitStatus：记录当前节点的等待状态，含义如下：
+         *   CANCELLED（1）：节点的线程因超时或中断被取消，不再参与队列同步，节点会被跳过且不会被唤醒。
+         *   SIGNAL（-1）：当前节点的后继节点需要被唤醒（unpark），即前驱节点释放锁时会唤醒当前节点，这是队列中最常见的等待状态。
+         *   CONDITION（-2）：节点在条件队列中等待（如 Condition.await()），不是在同步队列中，只有被 signal 后才会转移到同步队列。
+         *   PROPAGATE（-3）：用于共享模式（如读锁），表示需要向后传播唤醒操作，让后续节点也有机会被唤醒。
+         */
+
         /** Marker to indicate a node is waiting in shared mode */
         static final Node SHARED = new Node();
         /** Marker to indicate a node is waiting in exclusive mode */
@@ -530,6 +547,8 @@ public abstract class AbstractQueuedSynchronizer
     /**
      * The synchronization state.
      */
+    // 维护状态信息, 具体的状态信息由子类实现
+    // 对于ReebtrantLock表示重入次数, 对于CountDownlatch表示当前计数器的值
     private volatile int state;
 
     /**
@@ -580,6 +599,7 @@ public abstract class AbstractQueuedSynchronizer
      * @param node the node to insert
      * @return node's predecessor
      */
+    // 将Node推入队列
     private Node enq(final Node node) {
         for (;;) {
             Node t = tail;
@@ -602,11 +622,15 @@ public abstract class AbstractQueuedSynchronizer
      * @param mode Node.EXCLUSIVE for exclusive, Node.SHARED for shared
      * @return the new node
      */
+    // 添加一个指定模式的节点到队列末尾
+    // 可选模式: 独占(EXLUSIVE) 和 共享(SHARED)
     private Node addWaiter(Node mode) {
         Node node = new Node(Thread.currentThread(), mode);
         // Try the fast path of enq; backup to full enq on failure
         Node pred = tail;
         if (pred != null) {
+            // 链表中已经有节点存在
+
             node.prev = pred;
             if (compareAndSetTail(pred, node)) {
                 pred.next = node;
@@ -858,14 +882,19 @@ public abstract class AbstractQueuedSynchronizer
         boolean failed = true;
         try {
             boolean interrupted = false;
+            // 自旋锁
             for (;;) {
-                final Node p = node.predecessor();
+                final Node p = node.predecessor(); // 获取node节点的前驱节点
+                // 前驱节点是头节点, 且能够获取锁(前驱节点释放了锁)
                 if (p == head && tryAcquire(arg)) {
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
                     return interrupted;
                 }
+                // shouldParkAfterFailedAcquire()方法:
+                // 前驱节点
+                // parkAndCheckInterrupt()方法让线程调用LockSupport.park();
                 if (shouldParkAfterFailedAcquire(p, node) &&
                     parkAndCheckInterrupt())
                     interrupted = true;
@@ -1072,6 +1101,7 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if exclusive mode is not supported
      */
+    // 没有提供具体的实现, 而是交给子类去实现,如果子类没有实现则抛出异常
     protected boolean tryAcquire(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1098,6 +1128,7 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if exclusive mode is not supported
      */
+     // 没有提供具体的实现, 而是交给子类去实现,如果子类没有实现则抛出异常
     protected boolean tryRelease(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1134,6 +1165,8 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if shared mode is not supported
      */
+
+     // 没有提供具体的实现, 而是交给子类去实现,如果子类没有实现则抛出异常
     protected int tryAcquireShared(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1159,6 +1192,7 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if shared mode is not supported
      */
+     // 没有提供具体的实现, 而是交给子类去实现,如果子类没有实现则抛出异常
     protected boolean tryReleaseShared(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1178,6 +1212,7 @@ public abstract class AbstractQueuedSynchronizer
      *         {@code false} otherwise
      * @throws UnsupportedOperationException if conditions are not supported
      */
+    // 判断锁是被当前线程共享还是独占
     protected boolean isHeldExclusively() {
         throw new UnsupportedOperationException();
     }
@@ -1194,7 +1229,9 @@ public abstract class AbstractQueuedSynchronizer
      *        {@link #tryAcquire} but is otherwise uninterpreted and
      *        can represent anything you like.
      */
+    // 与acquireInterruptibly方法不一样, 该方法不会响应中断(不会因为中断而抛出异常)
     public final void acquire(int arg) {
+        // 调用tryAcquire()方法尝试获取对应的锁, 如果没有成功获取到锁,就添加
         if (!tryAcquire(arg) &&
             acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
             selfInterrupt();
@@ -1827,6 +1864,8 @@ public abstract class AbstractQueuedSynchronizer
      * <p>This class is Serializable, but all fields are transient,
      * so deserialized conditions have no waiters.
      */
+    // 维护了一个单向链表,只有被signal()或signalAll()唤醒后, 节点才会从条件队列转
+    // 移到同步队列(AbstractQueuedSynchronizer维护的双向链表) 参与锁的竞争
     public class ConditionObject implements Condition, java.io.Serializable {
         private static final long serialVersionUID = 1173984872572414699L;
         /** First node of condition queue. */
