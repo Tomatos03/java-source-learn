@@ -741,13 +741,24 @@ public final class Float extends Number implements Comparable<Float> {
      * @return the bits that represent the floating-point number.
      */
     public static int floatToIntBits(float value) {
+        // floatToRawIntBits 函数返回 value 按照 IEEE754 标准的二进制表示
         int result = floatToRawIntBits(value);
         // Check for NaN based on values of bit fields, maximum
         // exponent and nonzero significand.
+        //
+        // IEEE754标准规定32位浮点数的结构为：1位符号位 + 8位指数位 + 23位尾数位
+        // EXP_BIT_MASK -> 指数位掩码
+        // SIGNIF_BIT_MASK -> 尾数掩码
+        //
+        // 指数位 | 尾数位      | 代表含义         |
+        // |--------|-------------|------------------|
+        // | 254    | 全为 1      | 最大有限浮点数   |
+        // | 255    | 全为 0      | 正/负无穷        |
+        // | 255    | 非零        | NaN              |
         if ( ((result & FloatConsts.EXP_BIT_MASK) ==
               FloatConsts.EXP_BIT_MASK) &&
              (result & FloatConsts.SIGNIF_BIT_MASK) != 0)
-            result = 0x7fc00000;
+            result = 0x7fc00000; // ox7fc00000 -> 表示NaN(Not a Number)
         return result;
     }
 
