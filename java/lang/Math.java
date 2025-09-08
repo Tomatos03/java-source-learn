@@ -665,25 +665,42 @@ public final class Math {
      * @see     java.lang.Integer#MIN_VALUE
      */
     public static int round(float a) {
+        // 得到a在IEEE754标准下的二进制表示intBits
         int intBits = Float.floatToRawIntBits(a);
+        // EXP_BIT_MASK -> IEEE754标准小数表示之中的指数位(8位)掩码
+        // SIGNIFICAND_WIDTH -> IEEE754标准小数表示中的有效尾数的数位
+        // 有效尾数总位数 = 1（隐含）+ 23（存储） = 24
+        // biasedExp: 将IEEE754标准小数中指数位的最低位对齐到二进制最低
         int biasedExp = (intBits & FloatConsts.EXP_BIT_MASK)
                 >> (FloatConsts.SIGNIFICAND_WIDTH - 1);
+        // biasedExp 是带偏移量(127)的IEEE754 指数位
+        // (FloatConsts.SIGNIFICAND_WIDTH - 2 + FloatConsts.EXP_BIAS) - biasedExp
+        // 这里添加FloatConsts.EXP_BIAS, 是为了与后面的biasedExp做运算(相同偏移量下的运算)
+        /
+        // P = (FloatConsts.SIGNIFICAND_WIDTH - 1 + FloatConsts.EXP_BIAS) - biasedExp
+        // P 表示要把尾数右移多少位，才能让小数点左边全是整数位，右边全是小数位
+        // (P - 1) 就表示把尾数右边多少位才能够让小数位最低位进一位到整数位
+        //
+        // 这里的整数位和小数位指的是二进制形式表示的小数例如5.5的二进制小数形式是101.1
         int shift = (FloatConsts.SIGNIFICAND_WIDTH - 2
                 + FloatConsts.EXP_BIAS) - biasedExp;
         if ((shift & -32) == 0) { // shift >= 0 && shift < 32
             // a is a finite number such that pow(2,-32) <= ulp(a) < 1
+            // 提取尾数位,并设置隐含位
             int r = ((intBits & FloatConsts.SIGNIF_BIT_MASK)
                     | (FloatConsts.SIGNIF_BIT_MASK + 1));
             if (intBits < 0) {
                 r = -r;
             }
+            // ulp: 最小有效位
+            // 某个数的最小有效位ulp就是这个数到下一个能被计算机表示的浮点数之间的步长
             // In the comments below each Java expression evaluates to the value
             // the corresponding mathematical expression:
             // (r) evaluates to a / ulp(a)
             // (r >> shift) evaluates to floor(a * 2)
             // ((r >> shift) + 1) evaluates to floor((a + 1/2) * 2)
             // (((r >> shift) + 1) >> 1) evaluates to floor(a + 1/2)
-            return ((r >> shift) + 1) >> 1;
+            return ((r >> shift) + 1) >> 1; // floor(a + 0.5)
         } else {
             // a is either
             // - a finite number with abs(a) < exp(2,FloatConsts.SIGNIFICAND_WIDTH-32) < 1/2
