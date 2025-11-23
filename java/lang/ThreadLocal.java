@@ -157,7 +157,9 @@ public class ThreadLocal<T> {
      * @return the current thread's value of this thread-local
      */
     public T get() {
+        // 获取当前线程
         Thread t = Thread.currentThread();
+        // 拿到当前线程中专门维护提供给ThreadLocal使用的 ThreadLocalMap
         ThreadLocalMap map = getMap(t);
         if (map != null) {
             ThreadLocalMap.Entry e = map.getEntry(this);
@@ -167,6 +169,9 @@ public class ThreadLocal<T> {
                 return result;
             }
         }
+        // 如果当前线程维护的 ThreadLocalMap 为空,
+        // 或者 ThreadLocalMap 中没有当前 ThreadLocal 对应的 Entry
+        // 就调用 setInitialValue 方法进行初始化
         return setInitialValue();
     }
 
@@ -177,13 +182,15 @@ public class ThreadLocal<T> {
      * @return the initial value
      */
     private T setInitialValue() {
+        // initialValue 方法由子类重写, 用于提供初始值.
+        // 没有任何子类重写时默认返回null
         T value = initialValue();
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
         if (map != null)
-            map.set(this, value);
+            map.set(this, value); // Thread维护的 ThreadLocalMap 已经创建但没有对应的entry
         else
-            createMap(t, value);
+            createMap(t, value); // 没有创建 ThreadLocalMap
         return value;
     }
 
@@ -202,7 +209,7 @@ public class ThreadLocal<T> {
         if (map != null)
             map.set(this, value);
         else
-            createMap(t, value);
+            createMap(t, value); // 先初始化线程维护的ThreadLocalMap在将(this, value)作为entry放入map
     }
 
     /**
@@ -240,7 +247,11 @@ public class ThreadLocal<T> {
      * @param t the current thread
      * @param firstValue value for the initial entry of the map
      */
+    // 初始化当前线程维护的 ThreadLocalMap
+    // 并将(this, firstValue)作为一个entry添加到Map中
     void createMap(Thread t, T firstValue) {
+        // ThreadLocalMap(this, firstValue) 初始化 ThreadLocalMap
+        // 并将当前的(this, firstValue)作为一个entry添加到Map中
         t.threadLocals = new ThreadLocalMap(this, firstValue);
     }
 
@@ -295,6 +306,18 @@ public class ThreadLocal<T> {
      * used, stale entries are guaranteed to be removed only when
      * the table starts running out of space.
      */
+     // 无论ThreadLocalMap的key使用弱引用还是强引用, 总是存在内存泄露的风险:
+     // 只要Thread还在运行, 那么ThreadLocalMap总是存在, 同理内部的Entry也总是存在
+     // 当使用完ThreadLocal之后ThreadLocal的引用为null,
+     //
+     // 如果key使用强引用, ThreadLocal在堆中的内存仍然被ThreadLocalMap某个key引用, 此时由于key是强引用
+     // ThreaLocal的堆内存不会被垃圾回收器回收, 造成内存泄露
+     //
+     // 如果key使用弱引用, ThreadLocal在堆中的内存会被垃圾回收器回收, 但是ThreadLocalMap中的Entry对象仍然存在,
+     // 其中的key是null, 但是value仍然存在, 造成value内存泄露
+     //
+     // 如果key使用弱引用, 内存泄露的严重程序会比key使用强引用更轻一些, 但问题依然存在
+     // 想要避免内存泄露, 在不使用ThreadLocal之后, 需要及时的使用remove方法删除对应的entry
     static class ThreadLocalMap {
 
         /**
@@ -305,6 +328,8 @@ public class ThreadLocal<T> {
          * entry can be expunged from table.  Such entries are referred to
          * as "stale entries" in the code that follows.
          */
+         // ThreadLocalMap总是将 ThreadLocal 对象作为key
+         // WeakReferenc<T>, 其中T表示弱引用对象
         static class Entry extends WeakReference<ThreadLocal<?>> {
             /** The value associated with this ThreadLocal. */
             Object value;
@@ -324,8 +349,8 @@ public class ThreadLocal<T> {
          * The table, resized as necessary.
          * table.length MUST always be a power of two.
          */
-        private Entry[] table;
 
+        private Entry[] table;
         /**
          * The number of entries in the table.
          */
@@ -473,6 +498,7 @@ public class ThreadLocal<T> {
                 }
 
                 if (k == null) {
+                    // ThreadLocalMap key是弱引用, 当key = null 的时候表示当前entry已经失效
                     replaceStaleEntry(key, value, i);
                     return;
                 }
