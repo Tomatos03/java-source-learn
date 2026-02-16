@@ -160,6 +160,7 @@ abstract class Striped64 extends Number {
      // 值为0: 表示当前 cells 数组没有被初始化、扩容，也没有在新建 Cell 元素，即处于空闲状态。
      // 值为1: 表示当前 cells 数组正在被初始化、扩容，或者正在创建新的 Cell 元素，即处于忙碌状态。
      // 这个变量值的改变总是通过调用casCellsBusy()方法(CAS操作), 防止了竞态
+     // 基于cas的互斥锁
     transient volatile int cellsBusy;
 
     /**
@@ -226,6 +227,7 @@ abstract class Striped64 extends Number {
             h = getProbe();
             wasUncontended = true;
         }
+        // 是否发生碰撞
         boolean collide = false;                // True if last slot nonempty
         for (;;) {
             Cell[] as; Cell a; int n; long v;
@@ -287,12 +289,12 @@ abstract class Striped64 extends Number {
                 try {                           // Initialize table
                     if (cells == as) {
                         Cell[] rs = new Cell[2];
-                        rs[h & 1] = new Cell(x);
-                        cells = rs;
-                        init = true;
+                        rs[h & 1] = new Cell(x); // 在第一个或第二个位置放Cell
+                        cells = rs; // 更新当前维护的 cells
+                        init = true; // cells 成功初始化
                     }
                 } finally {
-                    cellsBusy = 0;
+                    cellsBusy = 0; // 释放锁
                 }
                 if (init)
                     break;

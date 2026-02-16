@@ -177,6 +177,7 @@ class Thread implements Runnable {
         return threadInitNumber++;
     }
 
+    // 变量threadLocals维护的是一个Map结构, 提供给ThreadLocal使用
     /* ThreadLocal values pertaining to this thread. This map is maintained
      * by the ThreadLocal class. */
     ThreadLocal.ThreadLocalMap threadLocals = null;
@@ -965,6 +966,9 @@ class Thread implements Runnable {
      * Tests if some Thread has been interrupted.  The interrupted state
      * is reset or not based on the value of ClearInterrupted that is
      * passed.
+     *
+     * 测试某个线程是否已被中断。中断状态是否被重置取决于传入的
+     * ClearInterrupted 参数的值。
      */
     private native boolean isInterrupted(boolean ClearInterrupted);
 

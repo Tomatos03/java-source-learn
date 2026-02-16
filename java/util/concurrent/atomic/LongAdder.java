@@ -81,27 +81,42 @@ public class LongAdder extends Striped64 implements Serializable {
      *
      * @param x the value to add
      */
+
+    /**
+     *
+     *  final boolean casBase(long cmp, long val) {
+     *     return UNSAFE.compareAndSwapLong(this, BASE, cmp, val);
+     *  }
+     *
+     *
+     */
     // 在一次进行添加操作的时候去初始化Cell数组
     // add是调用Unsafe的CAS操作,每次CAS操作只有一个线程能成功更新base或Cell
     public void add(long x) {
         Cell[] as; long b, v; int m; Cell a;
-        // casBase()方法封装了Unsafe的CAS操作
+        // base, cells从Striped64继承
+        // Cell数组为空表示之前并没有发生线程竞争, 无线程竞争时直接尝试对base变量进行cas操作, 如果失败了, 说明此时发生了线程竞争
         if ((as = cells) != null || !casBase(b = base, b + x)) {
-            // Cell[] 为null 或 CAS操作失败时执行
-            boolean uncontended = true; // uncontended = false 说明多个线程在竞争
+            // 执行到这里表示使用之前过cells数组(已经使用了分段的策略), 且本轮尝试对base值进行cas操作失败
+            // uncontended 表示Cell层面上是否没发生线程竞争
+            boolean uncontended = true;
+            /**
+             *
+             * as == null -> Cell为空引用, 没有启用分段累加策略
+             * m = as.length - 1 < 0 -> Cell数组已初始化但大小为0
+             * getProbe() & m -> 计算当前线程使用使用Cell数组中的哪一个Cell
+             * a[getProbe() & m] == null -> 对应的Cell没有初始化
+             * 执行到a.cas(v = a.value, v + x) -> 对应Cell初始化, 尝试在这个Cell进行cas累加操作
+             *
+             * longAccumulate被执行的情况:
+             * 1. 没有启用分段策略(Cell数组为null)
+             * 2. 当前线程在Cell数组分配到的位置没有初始化
+             * 3. 对分配到的位置进行cas的时候失败了
+             *
+             */
             if (as == null || (m = as.length - 1) < 0 ||
                 (a = as[getProbe() & m]) == null ||
                 !(uncontended = a.cas(v = a.value, v + x)))
-            /**
-             * longAccumulate方法被执行有以下情况(从上至下):
-             * 1. Cell[] 数组没有被创建
-             * 2. Cell[] 数组创建但没有任何元素
-             * 3. getProbe() & m 计算出来的新位置上不为null
-             * 4. 在getProbe() & m这个位置上的Cell执行CAS操作失败
-             *
-             * getProbe() & m -> 当前线程应该访问Cell数组的那一个Cell
-             * a.cas() -> 保证了多个线程操作被分配到的Cell的原子性
-             */
                 longAccumulate(x, null, uncontended); // 方法从Striped64类继承
         }
     }

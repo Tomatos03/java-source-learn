@@ -103,6 +103,12 @@ import java.util.Collection;
  * @since 1.5
  * @author Doug Lea
  */
+/**
+ * 锁特性:
+ * 1. 可重入
+ * 2. 支持公平锁和非公平锁之间的切换, 默认为非公平锁
+ * 3. 基于CAS操作实现的乐观锁
+ */
 public class ReentrantLock implements Lock, java.io.Serializable {
     private static final long serialVersionUID = 7373984872572414699L;
     /** Synchronizer providing all implementation mechanics */
@@ -195,6 +201,8 @@ public class ReentrantLock implements Lock, java.io.Serializable {
     /**
      * Sync object for non-fair locks
      */
+     // 这里的非公平指的是等待队列中的第一个节点和其他线程进行锁的竞争
+     // 当线程被加入等待队列之中, 仍然是仅有队头的节点有竞争锁的机会
     static final class NonfairSync extends Sync {
         private static final long serialVersionUID = 7316153563782823691L;
 
@@ -204,7 +212,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
          */
         final void lock() {
             if (compareAndSetState(0, 1))
-                setExclusiveOwnerThread(Thread.currentThread());
+                setExclusiveOwnerThread(Thread.currentThread()); // 设置锁拥有者为当前线程
             else
                 acquire(1);
         }
@@ -232,6 +240,9 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             final Thread current = Thread.currentThread();
             int c = getState();
             if (c == 0) {
+                // hasQueuedPredecessors: 判断在等待队列之中是否存在前驱节点(判断时不包含哨兵节点)
+                // 公平锁的核心, 如果存在前驱节点, 则表示当前线程不是等待时间最长的线程, 则不能获取锁
+                // 新线程到达时, 如果等待队列之中存在节点(不包括哨兵节点), 该方法保证新线程必然不参与竞争
                 if (!hasQueuedPredecessors() &&
                     compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);
@@ -239,8 +250,8 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                 }
             }
             else if (current == getExclusiveOwnerThread()) {
-                int nextc = c + acquires;
-                if (nextc < 0)
+                int nextc = c + acquires; // 状态叠加, 可重入次数加1
+                if (nextc < 0) // 超出int最大值时为负数
                     throw new Error("Maximum lock count exceeded");
                 setState(nextc);
                 return true;
@@ -254,7 +265,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * This is equivalent to using {@code ReentrantLock(false)}.
      */
     public ReentrantLock() {
-        sync = new NonfairSync();
+        sync = new NonfairSync(); // ReentrantLock 默认为非公平锁
     }
 
     /**
@@ -263,6 +274,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      *
      * @param fair {@code true} if this lock should use a fair ordering policy
      */
+    // fair = true -> 公平锁, fair = false -> 非公平锁
     public ReentrantLock(boolean fair) {
         sync = fair ? new FairSync() : new NonfairSync();
     }

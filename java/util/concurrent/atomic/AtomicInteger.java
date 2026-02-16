@@ -65,6 +65,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
         } catch (Exception ex) { throw new Error(ex); }
     }
 
+    // 防止jvm缓存优化, 保证value变量的可见性
     private volatile int value;
 
     /**
@@ -153,6 +154,16 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * Atomically increments by one the current value.
      *
      * @return the previous value
+     */
+
+    /**
+     *
+     * 原理类似:
+     *  do {
+     *    int preValue = get(); // 拿到当前值
+     *    int newValue = preValue - 1;
+     *  } while (!cas(preValue, newValue)) // 进行cas操作, 如果比较时的值仍然是preValue说明preValue从读取到当前时刻没有被其他线程改变或改变之后又设置成preValue(ABA问题)
+     *
      */
     public final int getAndIncrement() {
         return unsafe.getAndAddInt(this, valueOffset, 1);
