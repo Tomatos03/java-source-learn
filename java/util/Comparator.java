@@ -105,6 +105,8 @@ import java.util.Comparators;
  * @see java.io.Serializable
  * @since 1.2
  */
+// 与Comparable的区别：
+// Comparable接口标记一个对象是否可比较，Comparator接口偏向于工具函数，确定两个对象的顺序
 @FunctionalInterface
 public interface Comparator<T> {
     /**
@@ -147,6 +149,7 @@ public interface Comparator<T> {
      * @throws ClassCastException if the arguments' types prevent them from
      *         being compared by this comparator.
      */
+    // 与Comparable接口实现compareTo方法一样需要满足三大特性：反对称、一致性、传递性
     int compare(T o1, T o2);
 
     /**
@@ -464,6 +467,8 @@ public interface Comparator<T> {
     public static <T, U extends Comparable<? super U>> Comparator<T> comparing(
             Function<? super T, ? extends U> keyExtractor)
     {
+        // 传入的两个对象分别调用keyExtractor函数得到新的两个对象（新对象可能等价于老对象）
+        // 在确定新对象的顺序
         Objects.requireNonNull(keyExtractor);
         return (Comparator<T> & Serializable)
             (c1, c2) -> keyExtractor.apply(c1).compareTo(keyExtractor.apply(c2));
