@@ -375,14 +375,20 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * below).
      */
     private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
-    private static final int COUNT_BITS = Integer.SIZE - 3;
+    private static final int COUNT_BITS = Integer.SIZE - 3; // 32 - 3 = 29
+    // (1 << COUNT_BITS) - 1 = 0001 1111 1111 1111 1111 1111 1111 1111 高位3位表示运行状态，低位29位表示线程数量
     private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
 
     // runState is stored in the high-order bits
+    // 111 0000 0000 0000 0000 0000 0000 0000
     private static final int RUNNING    = -1 << COUNT_BITS;
+    // 000 0000 0000 0000 0000 0000 0000 0000
     private static final int SHUTDOWN   =  0 << COUNT_BITS;
+    // 001 0000 0000 0000 0000 0000 0000 0000
     private static final int STOP       =  1 << COUNT_BITS;
+    // 010 0000 0000 0000 0000 0000 0000 0000
     private static final int TIDYING    =  2 << COUNT_BITS;
+    // 011 0000 0000 0000 0000 0000 0000 0000
     private static final int TERMINATED =  3 << COUNT_BITS;
 
     // Packing and unpacking ctl
@@ -891,13 +897,22 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * state).
      * @return true if successful
      */
-    private boolean addWorker(Runnable firstTask, boolean core) {
+     /**
+      * 以下情况添加worker会失败:
+      * 1. 线程池不处于运行状态
+      * 2. 线程池达到上限容量2^29 - 1
+      * 3. 对于核心线程数量不超过核心线程数, 对于非核心线程数量不超过最大线程数 - 核心线程数
+      */
+     private boolean addWorker(Runnable firstTask, boolean core) {
         retry:
         for (;;) {
             int c = ctl.get();
             int rs = runStateOf(c);
 
             // Check if queue empty only if necessary.
+            // rs >= SHUTDOWN 表示非运行状态
+            // 此时线程池处于以下状态之一:
+            // STOP, TIDYING, TERMINATED
             if (rs >= SHUTDOWN &&
                 ! (rs == SHUTDOWN &&
                    firstTask == null &&
@@ -905,10 +920,14 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
                 return false;
 
             for (;;) {
+                // worker数量等于线程池线程数量
                 int wc = workerCountOf(c);
+                // worker数量超过线程池容量，或者worker数量超过corePoolSize或maximumPoolSize
+                // 时无法添加新线程
                 if (wc >= CAPACITY ||
                     wc >= (core ? corePoolSize : maximumPoolSize))
                     return false;
+                // CAS 让worker数量加一
                 if (compareAndIncrementWorkerCount(c))
                     break retry;
                 c = ctl.get();  // Re-read ctl
@@ -918,8 +937,8 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             }
         }
 
-        boolean workerStarted = false;
-        boolean workerAdded = false;
+        boolean workerStarted = false; // 线程是否启动
+        boolean workerAdded = false; // 线程是否已经添加到workers集合
         Worker w = null;
         try {
             w = new Worker(firstTask);
@@ -1352,20 +1371,29 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
          * thread.  If it fails, we know we are shut down or saturated
          * and so reject the task.
          */
-        int c = ctl.get();
+        // ctl维护了线程池的“运行状态”与“工作线程数”
+        int c = ctl.get(); // ctl: AutomicInteger
+        // 优先创建核心线程, 然后才创建非核心线程
         if (workerCountOf(c) < corePoolSize) {
             if (addWorker(command, true))
                 return;
             c = ctl.get();
         }
+        // workQueue.offer()返回false, 表示队列已满
         if (isRunning(c) && workQueue.offer(command)) {
             int recheck = ctl.get();
-            if (! isRunning(recheck) && remove(command))
+            if (!isRunning(recheck) && remove(command))
                 reject(command);
             else if (workerCountOf(recheck) == 0)
                 addWorker(null, false);
         }
         else if (!addWorker(command, false))
+        /**
+         * 失败策略调用时机:
+         * 1. 线程池不处于运行状态
+         * 2. 任务队列满
+         * 3. 当前线程池线程数量 = min(线程最大数量, 2^29 - 1)
+         */
             reject(command);
     }
 
