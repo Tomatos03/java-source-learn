@@ -287,9 +287,19 @@ import sun.misc.Unsafe;
  * @author Doug Lea
  */
 /**
- * AbstractQueuedSynchronizer的结构是怎么样的?
- * 维护了一个以节点构成的双向队列
+ * AbstractQueuedSynchronizer的结构说明:
+ * 1. 双向链表实现的等待队列,每个节点代表一个正在等待获取锁的线程。节点包含了线程信息、等待状态以及指向前后节点的引用。
+ * 2. 一个volatile修饰的int类型的state变量,表示同步状态。具体含义由子类定义. 例如ReentrantLock中表示重入次数,CountDownLatch中表示计数器的值。
  *
+ * 需要由子类实现的方法:
+ * | tryAcquire(int arg) | Exclusive | 尝试获取独占锁 |
+ * | tryRelease(int arg) | Exclusive | 尝试释放独占锁 |
+ * | tryAcquireShared(int arg) | Shared | 尝试获取共享锁 |
+ * | tryReleaseShared(int arg) | Shared | 尝试释放共享锁 |
+ * | isHeldExclusively() | Exclusive | 当前线程是否持有独占锁 |
+ *
+ * acquire 调用-> tryAcquire
+ * release 调用-> tryRelease
  */
 public abstract class AbstractQueuedSynchronizer
     extends AbstractOwnableSynchronizer
@@ -390,7 +400,7 @@ public abstract class AbstractQueuedSynchronizer
          *
          * waitStatus：记录当前节点的等待状态，含义如下：
          *   CANCELLED（1）：节点的线程因超时或中断被取消，不再参与队列同步，节点会被跳过且不会被唤醒。
-         *   SIGNAL（-1）：当前节点的后继节点需要被唤醒（unpark），即前驱节点释放锁时会唤醒当前节点，这是队列中最常见的等待状态。
+         *   SIGNAL（-1）： 表示当前节点的后继处于等待状态，当我（当前节点）释放资源时，我需要唤醒我的后继
          *   CONDITION（-2）：节点在条件队列中等待（如 Condition.await()），不是在同步队列中，只有被 signal 后才会转移到同步队列。
          *   PROPAGATE（-3）：用于共享模式（如读锁），表示需要向后传播唤醒操作，让后续节点也有机会被唤醒。
          */
@@ -622,7 +632,7 @@ public abstract class AbstractQueuedSynchronizer
      * @param mode Node.EXCLUSIVE for exclusive, Node.SHARED for shared
      * @return the new node
      */
-    // 添加一个指定模式的节点到队列末尾
+    // 添加一个新的等待节点到队列末尾
     // 可选模式: 独占(EXLUSIVE) 和 共享(SHARED)
     private Node addWaiter(Node mode) {
         Node node = new Node(Thread.currentThread(), mode);
@@ -659,6 +669,7 @@ public abstract class AbstractQueuedSynchronizer
      *
      * @param node the node
      */
+     // 唤醒node的后继节点
     private void unparkSuccessor(Node node) {
         /*
          * If status is negative (i.e., possibly needing signal) try
@@ -816,7 +827,9 @@ public abstract class AbstractQueuedSynchronizer
      * @param node the node
      * @return {@code true} if thread should block
      */
-    private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
+     // 如果前驱节点的状态不是SIGNAL就设置为SIGNAL, 以便前驱节点在释放锁时能够唤醒当前节点
+     // 前驱节点已经是SIGNAL状态返回true, 否则
+     private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
         int ws = pred.waitStatus;
         if (ws == Node.SIGNAL)
             /*
@@ -829,6 +842,7 @@ public abstract class AbstractQueuedSynchronizer
              * Predecessor was cancelled. Skip over predecessors and
              * indicate retry.
              */
+             // 清理失效的节点
             do {
                 node.prev = pred = pred.prev;
             } while (pred.waitStatus > 0);
@@ -878,14 +892,18 @@ public abstract class AbstractQueuedSynchronizer
      * @param arg the acquire argument
      * @return {@code true} if interrupted while waiting
      */
+    /**
+     * 等待队列中队头元素尝试获取锁, 如果获取失败就设置前驱节点状态为SIGNAL, 然后park(休眠等待唤醒),
+     *
+     *
+     */
     final boolean acquireQueued(final Node node, int arg) {
         boolean failed = true;
         try {
             boolean interrupted = false;
-            // 自旋锁
             for (;;) {
                 final Node p = node.predecessor(); // 获取node节点的前驱节点
-                // 前驱节点是头节点, 且能够获取锁(前驱节点释放了锁)
+                // 只有队头节点才有资格去竞争锁
                 if (p == head && tryAcquire(arg)) {
                     setHead(node);
                     p.next = null; // help GC
@@ -893,8 +911,9 @@ public abstract class AbstractQueuedSynchronizer
                     return interrupted;
                 }
                 // shouldParkAfterFailedAcquire()方法:
-                // 前驱节点
-                // parkAndCheckInterrupt()方法让线程调用LockSupport.park();
+                // 如果当前节点的前驱节点状态没有设置为SIGNAL, 就先设置前驱节点为SIGNAL, 下一轮循环在park当前节点
+                // 如果当前节点的前驱节点已经是SIGNAL状态, 就直接park当前节点
+                // 检查过程中会清理无效状态的节点(通过调整节点的pre和next)
                 if (shouldParkAfterFailedAcquire(p, node) &&
                     parkAndCheckInterrupt())
                     interrupted = true;
@@ -1101,7 +1120,6 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if exclusive mode is not supported
      */
-    // 没有提供具体的实现, 而是交给子类去实现,如果子类没有实现则抛出异常
     protected boolean tryAcquire(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1231,7 +1249,8 @@ public abstract class AbstractQueuedSynchronizer
      */
     // 与acquireInterruptibly方法不一样, 该方法不会响应中断(不会因为中断而抛出异常)
     public final void acquire(int arg) {
-        // 调用tryAcquire()方法尝试获取对应的锁, 如果没有成功获取到锁,就添加
+        // tryAcquire()由子类实现. 方法作用: 尝试获取锁
+        // 执行到acquireQueued()方法时等待队列中至少有两个节点
         if (!tryAcquire(arg) &&
             acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
             selfInterrupt();
