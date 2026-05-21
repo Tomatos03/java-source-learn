@@ -1013,9 +1013,13 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         int binCount = 0;
         for (Node<K,V>[] tab = table;;) {
             Node<K,V> f; int n, i, fh;
+            // node节点数组没有初始化
             if (tab == null || (n = tab.length) == 0)
                 tab = initTable();
+            // 节点数组对应的位置没有任何节点
+            // (n - 1) & hash 计算出节点数组对应的位置, 位置保证在数组范围内
             else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+                // cas 保证多个线程饿尝试放的时候, 仅有一个线程能够在节点数组某个位置初始化节点成功
                 if (casTabAt(tab, i, null,
                              new Node<K,V>(hash, key, value, null)))
                     break;                   // no lock when adding to empty bin
@@ -1024,17 +1028,19 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 tab = helpTransfer(tab, f);
             else {
                 V oldVal = null;
-                synchronized (f) {
+                // 锁加在某个节点上, 在该节点维护的链表或树找到一个空位置插入新节点
+                synchronized (f) { // f: Node<K,V> 数组中的节点, i: 节点对应的下标
                     if (tabAt(tab, i) == f) {
                         if (fh >= 0) {
                             binCount = 1;
                             for (Node<K,V> e = f;; ++binCount) {
                                 K ek;
+                                // 插入的(key, value), key内容和节点e维护的链表(或树节点)相同或地址相同
                                 if (e.hash == hash &&
                                     ((ek = e.key) == key ||
                                      (ek != null && key.equals(ek)))) {
                                     oldVal = e.val;
-                                    if (!onlyIfAbsent)
+                                    if (!onlyIfAbsent) // onlyIfAbsent 用于putIfAbsent方法
                                         e.val = value;
                                     break;
                                 }
