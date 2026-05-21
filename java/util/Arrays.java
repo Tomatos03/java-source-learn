@@ -141,6 +141,7 @@ public class Arrays {
      * @param a the array to be sorted
      */
     public static void sort(int[] a) {
+        // 双轴快速排序
         DualPivotQuicksort.sort(a, 0, a.length - 1, null, 0, 0);
     }
 
@@ -1240,10 +1241,12 @@ public class Arrays {
      *         {@link Comparable} contract
      */
     public static void sort(Object[] a) {
+        // JDK7+之后，默认使用TimSort算法进行排序，除非用户通过系统属性指定使用旧的归并排序算法。
+        // LegacyMergeSort.userRequested: boolean
         if (LegacyMergeSort.userRequested)
-            legacyMergeSort(a);
+            legacyMergeSort(a); // 归并排序
         else
-            ComparableTimSort.sort(a, 0, a.length, null, 0, 0);
+            ComparableTimSort.sort(a, 0, a.length, null, 0, 0); // TimSort排序
     }
 
     /** To be removed in a future release. */
