@@ -133,5 +133,17 @@ public interface Comparable<T> {
      * @throws ClassCastException if the specified object's type prevents it
      *         from being compared to this object.
      */
+
+    /*
+     * 可比较对象实现必须保证三个性质：
+     *  1. 反对称性：如果 x < y，那么必须 y > x
+     *  2. 传递性：如果 x > y 且 y > z，则 x > z
+     *  3. 一致性：如果 x 和 y 比较相等，那么它们与任何第三方对象 z 的比较结果应该相同
+     *
+     * | 反对称性 | 保证逻辑一致性   | 排序混乱、结果无法预测           |
+     * | 传递性   | 保证排序可行性   | 形成循环排序、某些元素无法定位    |
+     * | 一致性   | 保证集合的正确性 | TreeMap/TreeSet 行为与预期不符 |
+     *
+     */
     public int compareTo(T o);
 }
