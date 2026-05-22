@@ -63,6 +63,10 @@ public interface Function<T, R> {
      *
      * @see #andThen(Function)
      */
+    /**
+     * 一个类方法的返回值仍然是当前类，那么该方法支持链式调用
+     *
+     */
     default <V> Function<V, R> compose(Function<? super V, ? extends T> before) {
         Objects.requireNonNull(before);
         return (V v) -> apply(before.apply(v));
@@ -93,6 +97,11 @@ public interface Function<T, R> {
      *
      * @param <T> the type of the input and output objects to the function
      * @return a function that always returns its input argument
+     */
+    /**
+     * 调用方式示例：
+     * Function<Integer, Integer> func = Function.identity();
+     * 具体泛型参数从引用变量推断
      */
     static <T> Function<T, T> identity() {
         return t -> t;
