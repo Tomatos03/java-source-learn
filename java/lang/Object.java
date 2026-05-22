@@ -97,6 +97,27 @@ public class Object {
      * @see     java.lang.Object#equals(java.lang.Object)
      * @see     java.lang.System#identityHashCode
      */
+
+     /**
+      * 返回对象的哈希码值。此方法是为了有利于Hash表而设计的，
+      * 例如 HashMap 所提供的哈希表。
+      *
+      * hashCode 的通用约定如下：
+      * 1. 在 Java 应用程序的同一次执行期间，如果同一对象被多次调用 hashCode 方法，
+      *    必须始终返回相同的整数，前提是对象在 equals 比较中使用的信息没有被修改。
+      *    该整数不需要从应用程序的一次执行到另一次执行保持一致。
+      * 2. 如果两个对象根据 equals(Object) 方法是相等的，
+      *    那么对这两个对象分别调用 hashCode 方法必须产生相同的整数结果。
+      * 3. 并不要求如果两个对象根据 equals 方法不相等，
+      *    那么对这两个对象分别调用 hashCode 方法必须产生不同的整数结果。
+      *    但是，程序员应该意识到，为不相等的对象产生不同的整数结果
+      *    可能会提高哈希表的性能。
+      *
+      * 在合理可行的范围内，Object 类定义的 hashCode 方法确实会为不同的对象返回不同的整数。
+      * （这通常是通过将对象的内部地址转换为整数来实现的， 但这种实现技术不是 Java 编程语言所要求的。）
+      *
+      * @return  此对象的哈希码值
+      */
     public native int hashCode();
 
     /**
@@ -146,7 +167,7 @@ public class Object {
      * @see     java.util.HashMap
      */
     public boolean equals(Object obj) {
-        return (this == obj);
+        return (this == obj); // 比较当前对象和传入对象的内存地址是否相同
     }
 
     /**
@@ -209,6 +230,51 @@ public class Object {
      *               be cloned.
      * @see java.lang.Cloneable
      */
+    // 创建并返回此对象的一个副本。"副本"的具体含义取决于对象的类。
+    // 一般意图是，对于任何对象 x，以下表达式应成立：
+    //     x.clone() != x          // 为 true（克隆对象与原对象不是同一个对象）
+    //     x.clone().getClass() == x.getClass()  // 为 true（类型相同）
+    // 但这些并非绝对要求。通常情况下：
+    //     x.clone().equals(x)     // 为 true（内容相等）
+    // 这也不是绝对要求。
+    //
+    // 深拷贝和浅拷贝区别：
+    // - 浅拷贝
+    // p1 ──→ [name: "张三"] [age: 25] [address: ──┐
+    //                                             ↓
+    // p2 ──→ [name: "张三"] [age: 25] [address: ──┘  指向同一个 Address 对象
+    //
+    // - 深拷贝
+    // p1 ──→ [name: "张三"] [age: 25] [address: ──→ Address("北京") 原对象
+    // p2 ──→ [name: "张三"] [age: 25] [address: ──→ Address("北京") 副本
+    //
+    // 常见子类实现：
+    // @Override
+    // protected Object clone() throws CloneNotSupportedException {
+    //     return super.clone();
+    // }
+    // 克隆对象属性的数据类型是基本数据类型直接拷贝其值， 引用数据类型仅拷贝引用, 指向的对象仍然相同
+    // 可变对象应该实现深拷贝, 不可变对象实现浅拷贝!!!
+    //
+    // 手动实现深拷贝：
+    // class Person implements Cloneable {
+    //     String name;
+    //     int age;
+    //     Address address;
+    //
+    //     @Override
+    //     protected Person clone() throws CloneNotSupportedException {
+    //         Person person = (Person) super.clone();
+    //         cloned.address = (Address) this.address.clone();
+    //         return person;
+    //     }
+    // }
+    //
+    //
+    // 如果对象的类未实现 Cloneable 接口，则抛出 CloneNotSupportedException。
+    // 注意，所有数组都被认为实现了 Cloneable 接口，且数组类型 T[] 的 clone 方法返回类型为 T[]（T 为任何引用或基本类型）。
+    //
+    // Object 类本身未实现 Cloneable 接口， 因此对类为 Object 的对象调用 clone 方法将在运行时抛出异常。
     protected native Object clone() throws CloneNotSupportedException;
 
     /**
@@ -233,6 +299,7 @@ public class Object {
      * @return  a string representation of the object.
      */
     public String toString() {
+        // class对象名称@16进制表示的hashcode码
         return getClass().getName() + "@" + Integer.toHexString(hashCode());
     }
 
@@ -268,6 +335,24 @@ public class Object {
      * @see        java.lang.Object#notifyAll()
      * @see        java.lang.Object#wait()
      */
+    // 唤醒一个在当前对象监视锁上等待的线程。如果有多个线程在此对象监视锁上等待，
+    // 选择其中一个线程唤醒。选择是任意的，无法控制.
+    //
+    // 线程通过调用wait(有多个重载)方法来在对象监视锁上等待
+    //
+    // 1. 被唤醒的线程不会立即执行，因为当前线程持有对象监视锁.
+    // 2. 被唤醒的线程与其他活跃的线程一样需要竞争对象监视锁
+    // 3. 被唤醒的线程对于成为下一个持有对象监视锁的线程方面, 没有特权或劣势。
+    //
+    // 此方法只能由持有此对象监视锁的线程调用。
+    // 线程通过以下三种方式之一成为对象监视锁的所有者：
+    // 1. 执行该对象的 synchronized 实例方法。
+    // 2. 执行在该对象上同步的 synchronized 语句的代码块。
+    // 3. 对于 Class 类型的对象，执行该类的 synchronized 静态方法。
+    //
+    // 不是对象监视锁持有者调用该方法，抛出异常IllegalMonitorStateException
+    //
+    // 同一时刻只能有一个线程拥有对象的监视锁。
     public final native void notify();
 
     /**
@@ -292,6 +377,9 @@ public class Object {
      * @see        java.lang.Object#notify()
      * @see        java.lang.Object#wait()
      */
+    // 唤醒所有在此对象监视锁上等待的线程。线程通过调用 wait 方法之一在对象的监视器上等待。
+    //
+    // 此方法只能由拥有此对象监视器的线程调用。
     public final native void notifyAll();
 
     /**
@@ -379,6 +467,48 @@ public class Object {
      * @see        java.lang.Object#notify()
      * @see        java.lang.Object#notifyAll()
      */
+    // 使当前线程在对象监视锁上等待，直到另一个线程调用 notify() 或 notifyAll() 方法 或 指定的等待时间已到。
+    //
+    // 调用条件： 当前线程必须拥有此对象的监视器。
+    // 否则抛出: IllegalMonitorStateException
+    //
+    // 此方法会使当前线程（称为 T）将自身放入此对象的监视锁等待集中，
+    // 然后停止执行之后代码逻辑。线程 T 将停止线程调度并进入休眠状态，
+    // 直到以下四种情况之一发生：
+    // 1. 其他线程调用此对象的 notify() 方法，且线程 T 恰好被选中为被唤醒的线程。
+    // 2. 其他线程调用此对象的 notifyAll() 方法。
+    // 3. 其他线程中断线程 T。
+    // 4. 指定的等待时间已到。但是，如果 timeout 为零，则不考虑实际等待时间, 线程将一直等待直到被通知。
+    //
+    // 线程 T 随后从等待集中移除，并重新启用线程调度,  获得继续与其他线程竞争获取在此对象监视锁的权利；
+    // 一旦它获得了对象的控制权，对象的所有同步声明将恢复到 wait() 调用之前的状态。 -> 即重新执行synchronized包围代码块内容
+    //
+    // 线程也可能在未被通知、中断或超时的情况下被唤醒，即所谓的"虚假唤醒"。
+    // 虽然这种情况在实践中很少发生，但应用程序必须通过测试导致线程被唤醒的条件来进行防护，
+    // 如果条件不满足则继续等待。换句话说，等待应始终在循环中进行，例如：
+    //     synchronized (obj) {
+    //         while (<条件不满足>) {
+    //             obj.wait(timeout);
+    //         }
+    //         ... // 执行满足条件后的操作
+    //     }
+    //
+    // 如果当前线程在等待之前或等待期间被任何线程中断，则抛出 InterruptedException。
+    // 此异常直到此对象的锁状态按上述方式恢复后才会被抛出。
+    //
+    // 注意：wait() 方法只会释放当前对象的锁. 对于以下情况：
+    //  Object lockA = new Object();
+    //  Object lockB = new Object();
+    //  synchronized (lockA) {
+    //      synchronized (lockB) {
+    //          线程此时同时持有 lockA 和 lockB 两把锁
+    //          lockB.wait();
+    //          wait() 只释放了 lockB 的锁, 线程仍然持有 lockA 的锁！
+    //     }
+    // }
+    //
+    // 此方法只能由拥有此对象监视器的线程调用。
+    // timeout 单位/毫秒, timeout = 0表示无期限等待
     public final native void wait(long timeout) throws InterruptedException;
 
     /**
@@ -448,6 +578,7 @@ public class Object {
             throw new IllegalArgumentException("timeout value is negative");
         }
 
+        // nanos -> [0, 999999]
         if (nanos < 0 || nanos > 999999) {
             throw new IllegalArgumentException(
                                 "nanosecond timeout value out of range");
@@ -552,5 +683,17 @@ public class Object {
      * @see java.lang.ref.PhantomReference
      * @jls 12.6 Finalization of Class Instances
      */
+    // 当垃圾收集器确定不再有对该对象的引用时，由垃圾收集器在对象上调用此方法。
+    // 注意这里的执行时机是不确定的!
+    //
+    // Object 类的 finalize() 方法不执行任何特殊操作，只是正常返回。
+    //
+    // Java 编程语言不保证哪个线程会为任何给定对象调用 finalize() 方法。
+    // 但可以保证的是，调用 finalize() 的线程在调用时不会持有任何用户可见的同步锁。
+    // 如果 finalize() 方法抛出未捕获的异常，则该异常会被忽略，该对象的终结过程也会终止。
+    //
+    // 对于任何给定对象，Java 虚拟机永远不会多次调用其 finalize() 方法。
+    //
+    // finalize() 方法抛出的任何异常都会导致该对象的终结过程中止，但异常本身会被忽略。
     protected void finalize() throws Throwable { }
 }
