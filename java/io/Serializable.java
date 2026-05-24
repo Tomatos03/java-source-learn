@@ -166,5 +166,160 @@ package java.io;
  * @see java.io.Externalizable
  * @since   JDK1.1
  */
+
+ /**
+  * - 序列化接口没有方法或字段，仅用于标识可序列化的语义。
+  * - 实现 Serializable 接口即可启用序列化，未实现则不参与序列化。
+  * - 可序列化类的所有子类型本身都是可序列化的。
+  * - 遍历对象图时遇到不可序列化的对象将抛出 NotSerializableException。
+  *
+  * 非序列化父类的要求：父类未实现 Serializable 时，必须提供无参构造函数（public/protected），
+  * 否则反序列化时抛出 InvalidClassException。反序列化时父类字段通过无参构造函数初始化，
+  * 子类字段则从流中恢复。
+  *
+  * 在序列化和反序列化过程中需要特殊处理的类必须实现具有以下精确签名的特殊方法：
+  *
+  * 自定义序列化
+  * private void writeObject(java.io.ObjectOutputStream out) throws IOException
+  * 自定义反序列化
+  * private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException;
+  * 处理不完整流
+  * private void readObjectNoData() throws ObjectStreamException;
+  *
+  * writeObject：自定义序列化逻辑，通过 out.defaultWriteObject() 写入默认字段，
+  * 再手动写入需要特殊处理的字段（如 transient 敏感数据加密后写入）。
+  *
+  * 例：
+  * public class User {
+  *   private String name;
+  *   private int age;
+  *   private transient String password;
+  *   private void writeObject(ObjectOutputStream oos) throws IOException {
+  *     oos.defaultWriteObject();           // 先自动写 name、age
+  *     oos.writeUTF(encrypt(password));    // 再手动写加密后的 password
+  *   }
+  * }
+  *
+  * readObject：自定义反序列化逻辑，通过 in.defaultReadObject() 恢复默认字段，
+  * 可处理类新增字段（流中无该字段时使用默认值）。
+  *
+  * 例：
+  * class User implements Serializable {
+  *    private String name;
+  *    private int age;
+  *    private String email;  // 新版本新增的字段, 流中没有，使用默认值
+  *
+  *    private void readObject(ObjectInputStream ois) throws IOException, ClassNotFoundException {
+  *       ois.defaultReadObject();  // 自动恢复 name、age、email
+  *    }
+  * }
+  *
+  * readObjectNoData：当序列化流中找不到该类的数据时（如版本不匹配或流被篡改），
+  * 用于兜底初始化该类对象的状态。
+  *
+  * 例：
+  * class Animal implements Serializable {
+  *     private String name;
+  *
+  *     // 流中找不到 Animal 数据时，兜底初始化
+  *     private void readObjectNoData() throws ObjectStreamException {
+  *         this.name = "unknown";  // 安全的默认值
+  *     }
+  * }
+  *
+  * class Dog extends Animal implements Serializable {
+  *     private String breed;
+  * }
+  *
+  *
+  * ANY-ACCESS-MODIFIER Object writeReplace() throws ObjectStreamException;
+  * writeReplace：序列化时替换对象，可返回代理/DTO 替代原对象写入流。支持 private/protected/包私有访问。
+  *
+  * ANY-ACCESS-MODIFIER Object readResolve() throws ObjectStreamException;
+  * readResolve：反序列化时替换对象，常用于单例模式防止反序列化破坏唯一性。调用规则同 writeReplace。
+  *
+  * 方法调用时机（序列化流程）：
+  * ┌─────────────────────────────────────────────────────────────────┐
+  * │                    ObjectOutputStream.writeObject()             │
+  * │                                                                 │
+  * │  1. 调用 writeReplace() ──→ 返回替代对象(或原对象自身)          │
+  * │         │                                                       │
+  * │         ▼                                                       │
+  * │  2. 检查替代对象是否实现 Serializable                           │
+  * │         │                                                       │
+  * │         ▼                                                       │
+  * │  3. 调用 writeObject(默认实现)                                  │
+  * │         │                                                       │
+  * │         ▼                                                       │
+  * │  4. 递归处理对象图中的其他引用对象 ──→ 对每个重复步骤 1-4       │
+  * │                                                                 │
+  * └─────────────────────────────────────────────────────────────────┘
+  *
+  * 方法调用时机（反序列化流程）：
+  * ┌─────────────────────────────────────────────────────────────────┐
+  * │                  ObjectInputStream.readObject()                 │
+  * │                                                                 │
+  * │  1. 从流中读取字节 → 创建对象实例                               │
+  * │         │                                                       │
+  * │         ▼                                                       │
+  * │  2. 调用 readObject(默认实现)                                   │
+  * │         │                                                       │
+  * │         ▼                                                       │
+  * │  3. 调用 readResolve() ──→ 返回替代对象(或原对象自身)          │
+  * │         │                                                       │
+  * │         ▼                                                       │
+  * │  4. 递归处理对象图中的其他引用对象 ──→ 对每个重复步骤 1-4       │
+  * │                                                                 │
+  * └─────────────────────────────────────────────────────────────────┘
+  *
+  * 注意：writeReplace 发生在实际序列化之前，readResolve 发生在实际反序列化之后。
+  * 这两个方法允许在不改变外部序列化机制的情况下替换/校正对象。
+  *
+  * 例（writeReplace - 序列化时替换对象）：
+  * class User implements Serializable {
+  *     private String username;
+  *     private transient String password;  // transient关键字修饰字段不序列化
+  *
+  *     public User(String username, String password) {
+  *         this.username = username;
+  *         this.password = password;
+  *     }
+  *
+  *     // 序列化时用安全的代理对象替换原对象
+  *     private Object writeReplace() throws ObjectStreamException {
+  *         return new UserDTO(this.username);  // 只序列化必要信息
+  *     }
+  * }
+  *
+  * class UserDTO implements Serializable {
+  *     private String username;
+  *     public UserDTO(String username) { this.username = username; }
+  * }
+  *
+  * 例（readResolve - 反序列化时替换对象，常用于单例模式）：
+  * class Singleton implements Serializable {
+  *     private static final Singleton INSTANCE = new Singleton();
+  *     private String data;
+  *
+  *     private Singleton() { this.data = "default"; }
+  *
+  *     public static Singleton getInstance() { return INSTANCE; }
+  *
+  *     // 反序列化时返回已有的单例实例，避免创建新对象
+  *     private Object readResolve() throws ObjectStreamException {
+  *         return INSTANCE;  // 始终返回同一个实例
+  *     }
+  * }
+  *
+  * serialVersionUID：每个可序列化类关联的版本号，用于反序列化时校验发送方和接收方的类是否兼容。
+  * 不匹配时抛出 InvalidClassException。
+  *
+  * ANY-ACCESS-MODIFIER static final long serialVersionUID = 42L;
+  *
+  * - 未显式声明时，运行时会根据类细节自动计算出seriaVersionUID，但强烈建议显式声明（推荐 private 修饰符），
+  *   因为默认值对编译器实现敏感，可能导致意外的 InvalidClassException。
+  * - 数组类始终使用默认计算值，无需显示申明声明seriaVersionUID。
+  *
+  */
 public interface Serializable {
 }
