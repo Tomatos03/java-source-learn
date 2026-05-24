@@ -30,9 +30,11 @@ package java.lang;
  * reference to the {@code Class} object representing the Java keyword
  * void.
  *
+ *
  * @author  unascribed
  * @since   JDK1.1
  */
+ // Void 类是一个不可实例化的占位类，用于持有表示 Java 关键字 void 的 Class 对象。
 public final
 class Void {
 
