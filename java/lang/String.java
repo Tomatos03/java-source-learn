@@ -107,13 +107,34 @@ import java.util.regex.PatternSyntaxException;
  * @see     java.nio.charset.Charset
  * @since   JDK1.0
  */
+/**
+ * String类代表字符串。Java程序中所有字符串字面量，如"abc"， 都是该类的实例。
+ *
+ * 字符串是常量；它们的值在创建后不能被更改。字符串缓冲区支持可变字符串。
+ * 因为 String 对象是不可变的，所以它们可以被共享。例如：
+ *
+ *     String str = "abc";
+ * 等价于：
+ *     char data[] = {'a', 'b', 'c'};
+ *     String str = new String(data);
+ *
+ * Java 语言为字符串连接运算符"+"以及将其他对象转换为字符串提供了特殊支持。
+ * 字符串连接通过 StringBuilder 或 StringBuffer）类及其append方法实现
+ * 字符串转换通过 toString 方法实现，该方法定义在 Object 类
+ *
+ * String 字符串使用UTF-16字符集.
+ *
+ */
 
-public final class String
+// 字符串底层接口 CharSequence, 常见实现类： String, StringBuilder, StringBuffer, CharBuffer
+ public final class String
     implements java.io.Serializable, Comparable<String>, CharSequence {
     /** The value is used for character storage. */
+    // 用于存储实际的字符串
     private final char value[];
 
     /** Cache the hash code for the string */
+    // 字符串对象的缓存hash值
     private int hash; // Default to 0
 
     /** use serialVersionUID from JDK 1.0.2 for interoperability */
@@ -134,6 +155,10 @@ public final class String
      * an empty character sequence.  Note that use of this constructor is
      * unnecessary since Strings are immutable.
      */
+    /*
+     * 初始化一个新创建的 String 对象，使其表示空字符序列。
+     * 注意：由于 String 是不可变的，此构造函数实际上没有使用意义。
+     */
     public String() {
         this.value = new char[0];
     }
@@ -147,6 +172,15 @@ public final class String
      *
      * @param  original
      *         A {@code String}
+     */
+    /*
+     * 初始化一个新创建的 String 对象，使其表示与参数相同的字符序列。
+     * 新创建的字符串是参数字符串的副本。除非需要显式拷贝 original，
+     * 否则由于 String 不可变，此构造函数没有必要使用。
+     * 例:
+     *  String s = s0;
+     *  等价于：
+     *  String s = new String(s0); // 使用同一个value数组，没有实际意义
      */
     public String(String original) {
         this.value = original.value;
@@ -162,8 +196,15 @@ public final class String
      * @param  value
      *         The initial value of the string
      */
+    /*
+     * 分配一个新的 String，使其表示字符数组参数中当前包含的字符序列。
+     * 字符数组的内容会被复制；后续修改字符数组不会影响新创建的字符串。
+     */
     public String(char value[]) {
         this.value = Arrays.copyOf(value, value.length);
+        // Arrays.copyOf：复制原数组并创建新数组，长度指定为 value.length。
+        // 这是防御性拷贝，确保 String 内部的 char[] 与外部数组完全隔离，
+        // 外部修改 value 不会影响此 String，从而保证不可变性。
     }
 
     /**
@@ -187,6 +228,11 @@ public final class String
      *          If the {@code offset} and {@code count} arguments index
      *          characters outside the bounds of the {@code value} array
      */
+    /*
+     * 分配一个新的 String，包含字符数组参数的子数组中的字符。
+     * offset 是子数组第一个字符的索引，count 指定子数组的长度。
+     * 子数组的内容会被复制；后续修改字符数组不会影响新创建的字符串。
+     */
     public String(char value[], int offset, int count) {
         if (offset < 0) {
             throw new StringIndexOutOfBoundsException(offset);
@@ -195,6 +241,9 @@ public final class String
             throw new StringIndexOutOfBoundsException(count);
         }
         // Note: offset or count might be near -1>>>1.
+        // -1 >>> 1 等价于 Integer.MAX_VALUE
+        // offset + value.length > count 加法运算可能溢出，
+        // 所以等价转为为减法运算
         if (offset > value.length - count) {
             throw new StringIndexOutOfBoundsException(offset + count);
         }
@@ -229,6 +278,11 @@ public final class String
      *
      * @since  1.5
      */
+    /*
+     * 分配一个新的 String，包含 Unicode 码点数组参数的子数组中的字符。
+     * offset 是子数组第一个码点的索引，count 指定子数组的长度。
+     * 子数组的码点会被转换为 char；后续修改 int 数组不会影响新创建的字符串。
+     */
     public String(int[] codePoints, int offset, int count) {
         if (offset < 0) {
             throw new StringIndexOutOfBoundsException(offset);
@@ -237,6 +291,9 @@ public final class String
             throw new StringIndexOutOfBoundsException(count);
         }
         // Note: offset or count might be near -1>>>1.
+        // -1 >>> 1 等价于 Integer.MAX_VALUE
+        // offset + value.length > count 加法运算可能溢出，
+        // 所以等价转为为减法运算
         if (offset > codePoints.length - count) {
             throw new StringIndexOutOfBoundsException(offset + count);
         }
@@ -594,6 +651,12 @@ public final class String
     * a separate constructor is needed because we already have a public
     * String(char[]) constructor that makes a copy of the given char[].
     */
+    /*
+     * 包私有构造函数，直接共享传入的 char[] 以提升性能（不做防御性拷贝）。
+     * 调用方需确保传入的数组不会被外部修改。需要单独的构造函数是因为
+     * public String(char[]) 构造函数会拷贝数组，而此构造函数跳过拷贝。
+     * share方法参数不实际使用，仅用于区分String(char[] value)
+     */
     String(char[] value, boolean share) {
         // assert share : "unshared not supported";
         this.value = value;
@@ -1910,6 +1973,7 @@ public final class String
      *             {@code beginIndex} is negative or larger than the
      *             length of this {@code String} object.
      */
+    // 等价于 substring(beginIndex, value.length)
     public String substring(int beginIndex) {
         if (beginIndex < 0) {
             throw new StringIndexOutOfBoundsException(beginIndex);
@@ -2051,6 +2115,7 @@ public final class String
      * @return  a string derived from this string by replacing every
      *          occurrence of {@code oldChar} with {@code newChar}.
      */
+    // 将字符串中所有等于oldChar的字符替换成newChar
     public String replace(char oldChar, char newChar) {
         if (oldChar != newChar) {
             int len = value.length;
@@ -2856,13 +2921,16 @@ public final class String
         int len = value.length;
         int st = 0;
         char[] val = value;    /* avoid getfield opcode */
-
+        // 遍历完成之后st恰好在第一个非空白符所在位置
         while ((st < len) && (val[st] <= ' ')) {
             st++;
         }
+        // 遍历完成之后len恰好在最后一个非空白符字符下一个位置
         while ((st < len) && (val[len - 1] <= ' ')) {
             len--;
         }
+        // st > 0: 表示开头有至少一个空白符
+        // len < value.length: 表示结尾至少有一个空白符
         return ((st > 0) || (len < value.length)) ? substring(st, len) : this;
     }
 
@@ -2885,6 +2953,7 @@ public final class String
     public char[] toCharArray() {
         // Cannot use Arrays.copyOf because of class initialization order issues
         char result[] = new char[value.length];
+        // 拷贝value数组[0, value.length)的内容到result数组[0, value.length)
         System.arraycopy(value, 0, result, 0, value.length);
         return result;
     }
@@ -3151,6 +3220,12 @@ public final class String
      *
      * @return  a string that has the same contents as this string, but is
      *          guaranteed to be from a pool of unique strings.
+     */
+    /*
+     * 调用 intern() 时：若池中已有 equals 的字符串，返回池中的引用；
+     * 否则将该字符串加入池中并返回其引用。
+     * 因此 s.intern() == t.intern() 当且仅当 s.equals(t)。
+     * 所有字符串字面量和常量表达式都会被自动驻留（自动intern）。
      */
     public native String intern();
 }
