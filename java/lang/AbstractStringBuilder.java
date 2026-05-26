@@ -39,6 +39,16 @@ import java.util.Arrays;
  * or method in this class will cause a {@link NullPointerException} to be
  * thrown.
  *
+ /**
+  * 一个可变的字符序列容器。
+  *
+  * 实现了一个可修改的字符串。在任何时刻它包含一个特定的字符序列，
+  * 但该序列的长度和内容可以通过某些方法调用而改变。
+  *
+  * 除非另有说明，向此类的构造函数或方法中传递null参数
+  * 将导致抛出NullPointerException异常。
+  */
+ *
  * @author      Michael McCloskey
  * @author      Martin Buchholz
  * @author      Ulf Zibis
@@ -48,11 +58,13 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
     /**
      * The value is used for character storage.
      */
-    char[] value;
+     // 存储实际字符。字符串由多个字符组成
+     char[] value;
 
     /**
      * The count is the number of characters used.
      */
+     // 当前value数组字符数量
     int count;
 
     /**
@@ -126,14 +138,26 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
      * size check or synchronization.
      */
     void expandCapacity(int minimumCapacity) {
+        // 新容量为原来容量的两倍 + 2, 如果扩展后的容量还是不够，就直接把
+        // 参数值minimumCapacity作为新的容量
         int newCapacity = value.length * 2 + 2;
         if (newCapacity - minimumCapacity < 0)
             newCapacity = minimumCapacity;
+        // newCapacity超出int值正数范围时值为负
         if (newCapacity < 0) {
             if (minimumCapacity < 0) // overflow
                 throw new OutOfMemoryError();
             newCapacity = Integer.MAX_VALUE;
         }
+        // Arrays.copyOf():
+        //
+        // public static int[] copyOf(int[] original, int newLength) {
+        //     int[] copy = new int[newLength];
+        //     System.arraycopy(original, 0, copy, 0,
+        //                      Math.min(original.length, newLength));
+        //     return copy;
+        // }
+        //
         value = Arrays.copyOf(value, newCapacity);
     }
 
@@ -144,6 +168,12 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
      * Calling this method may, but is not required to, affect the value
      * returned by a subsequent call to the {@link #capacity()} method.
      */
+    /**
+     * 尝试减少用于字符序列的存储空间。
+     * 如果缓冲区大于保存其当前字符序列所需的大小，则可能会调整其大小以提高空间效率。
+     * 调用此方法可能会影响（但不一定需要影响）后续调用{@link #capacity()}方法返回的值。
+     */
+    // 将value容量设置为count
     public void trimToSize() {
         if (count < value.length) {
             value = Arrays.copyOf(value, count);
@@ -375,6 +405,7 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
      * @throws     IndexOutOfBoundsException  if {@code index} is
      *             negative or greater than or equal to {@code length()}.
      */
+    // 修改指定索引上的字符
     public void setCharAt(int index, char ch) {
         if ((index < 0) || (index >= count))
             throw new StringIndexOutOfBoundsException(index);
@@ -899,6 +930,7 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
      *             {@code length()}, or {@code start} is
      *             greater than {@code end}.
      */
+    // 获取字符串区间[start, end)之间的字符串
     public String substring(int start, int end) {
         if (start < 0)
             throw new StringIndexOutOfBoundsException(start);
