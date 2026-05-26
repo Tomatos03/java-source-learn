@@ -1801,24 +1801,36 @@ import java.util.regex.PatternSyntaxException;
      * @param   targetCount  count of the target string.
      * @param   fromIndex    the index to begin searching from.
      */
-    static int indexOf(char[] source, int sourceOffset, int sourceCount,
-            char[] target, int targetOffset, int targetCount,
-            int fromIndex) {
+    // 找到target字符串出现在source字符串的第一个起始位置
+    static int indexOf(
+        char[] source, int sourceOffset, int sourceCount,
+        char[] target, int targetOffset, int targetCount,
+        int fromIndex
+    ) {
+        // 如果起始位置已超出源字符串长度：
+        //   - 目标是空字符串，返回源字符串长度
+        //   - 否则返回 -1（找不到）
         if (fromIndex >= sourceCount) {
             return (targetCount == 0 ? sourceCount : -1);
         }
+        // 搜索起始位置小于0,重置起始位置为0
         if (fromIndex < 0) {
             fromIndex = 0;
         }
+        // 目标字符串是空串, 直接返回搜索起始位置
         if (targetCount == 0) {
             return fromIndex;
         }
 
+        // 目标字符串第一个字符
         char first = target[targetOffset];
+        // max = 源字符串中最后一个可能的匹配起始位置
+        // 例：源长度10，目标长度3，起始索引则最多匹配到索引7
         int max = sourceOffset + (sourceCount - targetCount);
 
         for (int i = sourceOffset + fromIndex; i <= max; i++) {
             /* Look for first character. */
+            // 找到源字符串于目标字符串第一个字符匹配的位置
             if (source[i] != first) {
                 while (++i <= max && source[i] != first);
             }
