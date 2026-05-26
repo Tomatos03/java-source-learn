@@ -46,8 +46,23 @@ import java.io.IOException;
  * with different styles of error handling there is no guarantee that
  * errors will be propagated to the invoker.
  *
+ *
  * @since 1.5
  */
+
+ /**
+  * 一个可以追加字符序列和值的对象。任何其实例需要接收来自Formatter
+  * 的格式化输出的类都必需实现Appendable接口。
+  *
+  * 要追加的字符应该是有效的Unicode字符，如Unicode字符表示中所述。
+  * 注意，补充字符可能由多个16位char值组成。
+  *
+  * Appendable不一定是线程安全的。线程安全是扩展并实现此接口
+  * 的类的责任。
+  *
+  * 由于此接口可能由具有不同错误处理风格的现有类实现，
+  * 因此不能保证错误将传播给调用者。
+  */
 public interface Appendable {
 
     /**
@@ -68,6 +83,7 @@ public interface Appendable {
      * @throws  IOException
      *          If an I/O error occurs
      */
+    // 添加一个序列到可添加对象中
     Appendable append(CharSequence csq) throws IOException;
 
     /**
@@ -104,6 +120,7 @@ public interface Appendable {
      * @throws  IOException
      *          If an I/O error occurs
      */
+    // 添加一个子序列到可添加对象中, 子序列截取至csq的[start, end)部分
     Appendable append(CharSequence csq, int start, int end) throws IOException;
 
     /**
@@ -117,5 +134,6 @@ public interface Appendable {
      * @throws  IOException
      *          If an I/O error occurs
      */
+     // 添加指定字符到可添加对象中
     Appendable append(char c) throws IOException;
 }
