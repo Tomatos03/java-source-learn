@@ -56,6 +56,18 @@ import java.util.stream.StreamSupport;
  * @spec JSR-51
  */
 
+/**
+ * CharSequence 是一个可读的 char 值序列。该接口提供了对许多不同类型的
+ * char 序列的统一、只读访问方式。
+ * 一个 char 值表示基本多文种平面 (BMP) 中的一个字符或一个代理项。
+ * 详见 Unicode 字符表示形式。
+ *
+ * 该接口没有细化 equals 和 hashCode 方法的通用约定。因此，比较两个实现了
+ * CharSequence 的对象的结果通常是未定义的。每个对象可能由不同的类实现，
+ * 且不保证每个类都能测试其实例与另一个类的实例是否相等。因此，将任意的
+ * CharSequence 实例用作集合中的元素或映射中的键是不合适的。
+ */
+
 public interface CharSequence {
 
     /**
@@ -64,6 +76,7 @@ public interface CharSequence {
      *
      * @return  the number of <code>char</code>s in this sequence
      */
+    // 返回此字符序列的长度，即序列中 char（占用16位，即两个字节） 的数量
     int length();
 
     /**
@@ -84,6 +97,9 @@ public interface CharSequence {
      *          if the <tt>index</tt> argument is negative or not less than
      *          <tt>length()</tt>
      */
+    // 返回指定索引处的 char 值。索引范围从 0 到 length() - 1，
+    // 序列的第一个 char 值在索引 0 处，下一个在索引 1 处，依此类推，与数组索引方式相同。
+    // 如果索引指定的 char 值是一个代理项（代理项占一个char大小），则直接返回该代理项值。
     char charAt(int index);
 
     /**
@@ -104,6 +120,8 @@ public interface CharSequence {
      *          if <tt>end</tt> is greater than <tt>length()</tt>,
      *          or if <tt>start</tt> is greater than <tt>end</tt>
      */
+    // 返回序列索引从[start, end)索引的子序列
+    // 返回序列的长度为 end - start，因此如果 start == end 则返回空序列。
     CharSequence subSequence(int start, int end);
 
     /**
@@ -113,6 +131,7 @@ public interface CharSequence {
      *
      * @return  a string consisting of exactly this sequence of characters
      */
+    // 返回包含此序列中所有字符的字符串，顺序与原序列相同。字符串的长度等于此序列的长度。
     public String toString();
 
     /**
@@ -127,6 +146,14 @@ public interface CharSequence {
      * @return an IntStream of char values from this sequence
      * @since 1.8
      */
+    // 返回此序列中 char 值的 IntStream 流。每个 char 值被零扩展为 int 值后传入流中，
+    // 代理项 char 也会被原样传入，不做特殊处理。
+    // 如果在读取流的过程中序列被修改，结果是未定义的。
+    //
+    // 零扩展 (Zero Extension)：将较小的无符号类型转为较大的类型时，高位填充 0。
+    // 例如 char '中' (U+4E2D) 的 16 位二进制: 0100 1110 0010 1101
+    // 零扩展为 int (32位): 0000 0000 0000 0000 0100 1110 0010 1101（值仍为 20013）
+    // 这样保证 char 转 int 后值不变（0~65535），不会变成负数。
     public default IntStream chars() {
         class CharIterator implements PrimitiveIterator.OfInt {
             int cur = 0;
