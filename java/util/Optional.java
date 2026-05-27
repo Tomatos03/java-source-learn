@@ -47,11 +47,28 @@ import java.util.function.Supplier;
  *
  * @since 1.8
  */
+/**
+ * 一个可以包含也可以不包含非空值的容器对象。
+ * 如果值存在，isPresent() 将返回 true，get() 将返回该值。
+ *
+ * 还提供了一些依赖于包含值是否存在的额外方法，例如
+ * orElse()（如果值不存在则返回默认值）和
+ * ifPresent()（如果值存在则执行一段代码块）。
+ *
+ * 这是一个基于值的类；对 Optional 实例使用
+ * 敏感于标识的操作（包括引用相等性（==）、标识哈希码或同步）可能会产生不可预测的结果，应避免使用。
+ *
+ * 1. 引用相等性比较（==）：Optional 没有保证是单例，两个值相同的 Optional 对象用 == 比较可能返回 false，应该用 equals() 比较。
+ * 2. 身份哈希码（identity hash code）：由于 Optional 不保证同一个实例被重用，依赖 System.identityHashCode() 等方法的结果是不确定的。
+ * 3. 同步（synchronization）：不要把 Optional 对象当作同步锁来用（如 synchronized(optional)），因为 JVM 可能会复用或优化这些对象，导致意外的线程安全问题。
+ *
+ */
 public final class Optional<T> {
     /**
      * Common instance for {@code empty()}.
      */
-    private static final Optional<?> EMPTY = new Optional<>();
+     // 空对象全局工用同一份对象
+     private static final Optional<?> EMPTY = new Optional<>();
 
     /**
      * If non-null, the value; if null, indicates no value is present
@@ -249,6 +266,7 @@ public final class Optional<T> {
      * be null
      * @return the value, if present, otherwise {@code other}
      */
+    // value值为空时返回传入值，否则返回value
     public T orElse(T other) {
         return value != null ? value : other;
     }
@@ -263,6 +281,7 @@ public final class Optional<T> {
      * @throws NullPointerException if value is not present and {@code other} is
      * null
      */
+    // value值为空时从传入get函数中拿到值，否则返回value
     public T orElseGet(Supplier<? extends T> other) {
         return value != null ? value : other.get();
     }
@@ -283,6 +302,7 @@ public final class Optional<T> {
      * @throws NullPointerException if no value is present and
      * {@code exceptionSupplier} is null
      */
+    // 如果value是空直接抛出异常，异常从提供的Supplier函数式接口实现类中获取
     public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
         if (value != null) {
             return value;
@@ -305,6 +325,9 @@ public final class Optional<T> {
      * otherwise {@code false}
      */
     @Override
+    // obj必须是Optional类型，且维护的value与
+    // 当前对象value使用的是同一个value或调用当前对象
+    // 维护的value的equals方法为true
     public boolean equals(Object obj) {
         if (this == obj) {
             return true;

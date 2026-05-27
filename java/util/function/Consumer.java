@@ -60,6 +60,8 @@ public interface Consumer<T> {
      * operation followed by the {@code after} operation
      * @throws NullPointerException if {@code after} is null
      */
+    // 执行完当前实例的accept方法后在执行andThen()方法参数提供的
+    // accept()方法，支持链式调用
     default Consumer<T> andThen(Consumer<? super T> after) {
         Objects.requireNonNull(after);
         return (T t) -> {
