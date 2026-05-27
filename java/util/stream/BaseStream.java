@@ -61,6 +61,11 @@ import java.util.function.Predicate;
  * @see DoubleStream
  * @see <a href="package-summary.html">java.util.stream</a>
  */
+/**
+ * 流的基础接口，支持顺序和并行聚合操作的元素序列。
+ * 终端操作: 终端操作是流管道中的最后一个操作，它会消费流中的元素并产生一个结果或副作用，执行后流就被关闭了，不能再进行其他操作。
+ *
+ */
 public interface BaseStream<T, S extends BaseStream<T, S>>
         extends AutoCloseable {
     /**
@@ -70,6 +75,9 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      * operation</a>.
      *
      * @return the element iterator for this stream
+     */
+    /**
+     * 返回此流中元素的迭代器。这是一个终端操作。
      */
     Iterator<T> iterator();
 
@@ -81,6 +89,9 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      *
      * @return the element spliterator for this stream
      */
+    /**
+     * 返回此流中元素的分割迭代器。这是一个终端操作。
+     */
     Spliterator<T> spliterator();
 
     /**
@@ -89,6 +100,9 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      * terminal stream operation method may yield unpredictable results.
      *
      * @return {@code true} if this stream would execute in parallel if executed
+     */
+    /**
+     * 返回此流是否会以并行方式执行。如果在调用终端操作方法后调用此方法，可能会产生不可预测的结果。
      */
     boolean isParallel();
 
@@ -102,6 +116,9 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      *
      * @return a sequential stream
      */
+    /**
+     * 返回一个等价的顺序流。可能返回自身，因为流已经是顺序的，或者底层流状态已被修改为顺序的。这是一个中间操作。
+     */
     S sequential();
 
     /**
@@ -113,6 +130,9 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      * operation</a>.
      *
      * @return a parallel stream
+     */
+    /**
+     * 返回一个等价的并行流。可能返回自身，因为流已经是并行的，或者底层流状态已被修改为并行的。这是一个中间操作。
      */
     S parallel();
 
@@ -126,6 +146,9 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      * operation</a>.
      *
      * @return an unordered stream
+     */
+    /**
+     * 返回一个等价的无序流。可能返回自身，因为流已经是无序的，或者底层流状态已被修改为无序的。这是一个中间操作。
      */
     S unordered();
 
@@ -147,6 +170,11 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      * @param closeHandler A task to execute when the stream is closed
      * @return a stream with a handler that is run if the stream is closed
      */
+    /**
+     * 返回一个等价的流，并添加一个关闭处理器。当调用流的close()方法时，关闭处理器会被执行，执行顺序与添加顺序相同。
+     * 即使早期的关闭处理器抛出异常，所有关闭处理器都会被执行。如果任何关闭处理器抛出异常，第一个抛出的异常将被传递给close()的调用者，
+     * 其余异常将作为被抑制的异常添加到该异常中（除非其余异常与第一个异常相同，因为异常不能抑制自身）。可能返回自身。这是一个中间操作。
+     */
     S onClose(Runnable closeHandler);
 
     /**
@@ -154,6 +182,9 @@ public interface BaseStream<T, S extends BaseStream<T, S>>
      * to be called.
      *
      * @see AutoCloseable#close()
+     */
+    /**
+     * 关闭此流，导致此流管道的所有关闭处理器被调用。
      */
     @Override
     void close();
