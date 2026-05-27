@@ -46,6 +46,7 @@ public interface Predicate<T> {
      * @return {@code true} if the input argument matches the predicate,
      * otherwise {@code false}
      */
+    // 评估给定值是否为true
     boolean test(T t);
 
     /**
@@ -64,6 +65,7 @@ public interface Predicate<T> {
      * AND of this predicate and the {@code other} predicate
      * @throws NullPointerException if other is null
      */
+    // 等价于多个布尔值使用and进行连接
     default Predicate<T> and(Predicate<? super T> other) {
         Objects.requireNonNull(other);
         return (t) -> test(t) && other.test(t);
@@ -76,6 +78,7 @@ public interface Predicate<T> {
      * @return a predicate that represents the logical negation of this
      * predicate
      */
+    // 取反评估方法的结果
     default Predicate<T> negate() {
         return (t) -> !test(t);
     }
@@ -96,6 +99,7 @@ public interface Predicate<T> {
      * OR of this predicate and the {@code other} predicate
      * @throws NullPointerException if other is null
      */
+     // 等价于多个布尔条件取or条件
     default Predicate<T> or(Predicate<? super T> other) {
         Objects.requireNonNull(other);
         return (t) -> test(t) || other.test(t);
@@ -111,6 +115,14 @@ public interface Predicate<T> {
      * @return a predicate that tests if two arguments are equal according
      * to {@link Objects#equals(Object, Object)}
      */
+    // targetRef为null时等价于
+    // boolean test(Object t) {
+    //  return t == null
+    // }
+    // 不为null时等价于
+    // boolean test(Object t) {
+    //  return targetRef.equals(t)
+    // }
     static <T> Predicate<T> isEqual(Object targetRef) {
         return (null == targetRef)
                 ? Objects::isNull
