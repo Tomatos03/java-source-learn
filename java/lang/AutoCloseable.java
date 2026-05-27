@@ -48,6 +48,10 @@ package java.lang;
  * @author Josh Bloch
  * @since 1.7
  */
+/**
+ * 一个可能持有资源（如文件或套接字句柄）的对象，直到它被关闭。当退出声明了该对象的try-with-resources块时，
+ * AutoCloseable对象的close()方法会自动调用。这种构造确保了资源的及时释放，避免了资源耗尽异常和可能发生的其他错误。
+ */
 public interface AutoCloseable {
     /**
      * Closes this resource, relinquishing any underlying resources.
@@ -93,6 +97,44 @@ public interface AutoCloseable {
      * to make their {@code close} methods idempotent.
      *
      * @throws Exception if this resource cannot be closed
+     */
+    /**
+     * 关闭此资源，释放任何底层资源。此方法在由try-with-resources语句管理的对象上自动调用。
+     * 虽然此接口方法声明抛出Exception，但强烈建议实现者声明close方法的具体实现以抛出更具体的异常，或者如果关闭操作不会失败则不抛出任何异常。
+     * 关闭操作可能失败的情况需要实现者的仔细关注。强烈建议在抛出异常之前释放底层资源并在内部标记资源为已关闭。close方法不太可能被调用多次，因此这确保了资源及时释放。此外，它减少了当资源包装或被包装时可能出现的问题。
+     * 此接口的实现者也强烈建议不要让close方法抛出InterruptedException。此异常与线程的中断状态相互作用，如果InterruptedException被抑制，则可能发生运行时不当行为。
+     * 更一般地说，如果异常被抑制会导致问题，则AutoCloseable.close方法不应该抛出它。
+     * 注意，与Closeable的close方法不同，此close方法不需要是幂等的。换句话说，多次调用此close方法可能会产生一些可见的副作用，而Closeable.close被要求多次调用时没有任何影响。
+     * 但是，此接口的实现者强烈建议使其close方法幂等。
+     *
+     * 代码示例：
+     * // 1. 实现AutoCloseable接口的资源类
+     * class FileResource implements AutoCloseable {
+     *     private boolean closed = false;
+     *
+     *     @Override
+     *     public void close() throws IOException {
+     *         if (closed) {
+     *             return;  // 幂等性：多次调用不会产生副作用
+     *         }
+     *         // 释放底层资源
+     *         System.out.println("释放文件资源");
+     *         closed = true;
+     *     }
+     * }
+     *
+     * // 2. 使用try-with-resources自动管理资源
+     * try (FileResource resource = new FileResource()) {
+     *     System.out.println("使用资源");
+     * } // 自动调用close()方法，无需显式调用
+     *
+     * // 3. 不推荐的做法：手动管理资源
+     * FileResource resource = new FileResource();
+     * try {
+     *     System.out.println("使用资源");
+     * } finally {
+     *     resource.close();  // 需要手动调用
+     * }
      */
     void close() throws Exception;
 }
