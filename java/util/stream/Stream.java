@@ -166,6 +166,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *                  should be included
      * @return the new stream
      */
+    // 返回包含与给定谓词匹配的此流元素的流（中间操作）
     Stream<T> filter(Predicate<? super T> predicate);
 
     /**
@@ -181,6 +182,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *               function to apply to each element
      * @return the new stream
      */
+    // 返回包含将给定函数应用于此流元素的结果的流（中间操作）
     <R> Stream<R> map(Function<? super T, ? extends R> mapper);
 
     /**
@@ -195,6 +197,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *               function to apply to each element
      * @return the new stream
      */
+    // 返回包含将给定函数应用于此流元素的结果的整数流（中间操作）
     IntStream mapToInt(ToIntFunction<? super T> mapper);
 
     /**
@@ -209,6 +212,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *               function to apply to each element
      * @return the new stream
      */
+    // 返回包含将给定函数应用于此流元素的结果的长整数流（中间操作）
     LongStream mapToLong(ToLongFunction<? super T> mapper);
 
     /**
@@ -223,6 +227,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *               function to apply to each element
      * @return the new stream
      */
+    // 返回包含将给定函数应用于此流元素的结果的浮点数流（中间操作）
     DoubleStream mapToDouble(ToDoubleFunction<? super T> mapper);
 
     /**
@@ -356,6 +361,56 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *
      * @return the new stream
      */
+    /**
+     * 返回由此流的不同元素（根据 equals 方法）组成的流。
+     *
+     * 这是一个有状态的中间操作。
+     *
+     * 对于有序流： 不同元素的选择是稳定的（对于重复元素，保留顺序中首次出现的元素）。
+     * 对于无序流： 不提供稳定性保证。
+     *
+     * 示例：有序流的稳定性
+     *     // 有序流（如 List.stream()）
+     *     List<String> list = Arrays.asList("apple", "banana", "apple", "cherry", "banana");
+     *     List<String> result = list.stream().distinct().collect(Collectors.toList());
+     *     // 结果: ["apple", "banana", "cherry"]
+     *     // apple 首次出现在索引0，banana 首次出现在索引1，cherry 首次出现在索引3
+     *     // 重复的元素被移除，保留首次出现的位置
+     *
+     * 示例：无序流的不确定性
+     *     // 无序流（如 Stream.generate() 或 parallelStream().unordered()）
+     *     Stream<String> unordered = Stream.of("apple", "banana", "apple", "cherry", "banana")
+     *                                      .parallel()
+     *                                      .unordered();
+     *     List<String> result2 = unordered.distinct().collect(Collectors.toList());
+     *     // 结果: ["apple", "banana", "cherry"] 但顺序不确定
+     *     // 可能是 ["cherry", "apple", "banana"] 或其他顺序
+     *     // 因为无序流不保证保留首次出现的顺序
+     *
+     *
+     * 在并行管道中保持 distinct 的稳定性相对昂贵（要求该操作充当完全屏障，
+     * 具有大量的缓冲开销），而且稳定性通常不是必需的。使用无序流源（例如
+     * generate 方法）或通过 unordered 方法移除排序约束，
+     * 如果语义允许，可能会显著提高并行管道中 distinct 的执行效率。
+     * 如果需要与遭遇顺序保持一致，且在并行管道中使用 distinct 时遇到
+     * 性能或内存利用率问题，切换到 sequential 顺序执行可能会改善性能。
+     *
+     * 示例：使用 unordered 提高性能
+     *     // 并行流默认保持稳定性，性能开销大
+     *     List<String> list = Arrays.asList("a", "b", "a", "c", "b");
+     *     list.parallelStream().distinct().collect(Collectors.toList());
+     *
+     *     // 移除排序约束，提高并行性能
+     *     list.parallelStream().unordered().distinct().collect(Collectors.toList());
+     *
+     * 示例：需要顺序一致性时改用顺序执行
+     *     // 并行流性能不佳时
+     *     list.parallelStream().distinct().collect(Collectors.toList());
+     *
+     *     // 切换到顺序执行
+     *     list.stream().distinct().collect(Collectors.toList());
+     *
+     */
     Stream<T> distinct();
 
     /**
@@ -371,6 +426,17 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * intermediate operation</a>.
      *
      * @return the new stream
+     */
+    /**
+     * 返回由此流的元素组成的流，按照自然顺序排序(按照流元素重写的compareTo方法逻辑排序）。
+     * 如果此流的元素不是 Comparable 的，在执行终端操作时可能会抛出 java.lang.ClassCastException。
+     *
+     * 对于有序流，排序是稳定的。对于无序流，不提供稳定性保证。
+     *
+     * 排序的稳定性：如果两个元素的值相等，排序后它们的相对顺序保持不变**
+     *
+     * 这是一个有状态的中间操作。
+     *
      */
     Stream<T> sorted();
 
@@ -389,6 +455,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *                   {@code Comparator} to be used to compare stream elements
      * @return the new stream
      */
+    // 按照提供的比较器对流元素进行排序
     Stream<T> sorted(Comparator<? super T> comparator);
 
     /**
@@ -420,6 +487,35 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *                 they are consumed from the stream
      * @return the new stream
      */
+    /**
+     * 返回由此流的元素组成的流，在从结果流中消费元素时，对每个元素执行提供的操作。
+     *
+     * 这是一个中间操作。
+     *
+     * 对于并行流管道，操作可能在任何时间和任何线程中被调用，该线程由上游操作提供元素。
+     * 如果操作修改共享状态，则有责任提供所需的同步。
+     *
+     * 示例：不安全的并行流操作
+     *     List<String> sharedList = new ArrayList<>();
+     *     IntStream.range(0, 1000).parallel().peek(e -> {
+     *         // 多个线程同时修改共享列表，可能导致并发修改异常或数据丢失
+     *         sharedList.add(String.valueOf(e));
+     *     }).count();
+     *
+     * 示例：安全的并行流操作
+     *     List<String> safeList = Collections.synchronizedList(new ArrayList<>());
+     *     IntStream.range(0, 1000).parallel().peek(e -> {
+     *         // 使用线程安全的集合来保护共享状态
+     *         safeList.add(String.valueOf(e));
+     *     }).count();
+     *
+     * 示例：最佳实践 - 避免在并行流中修改共享状态
+     *     List<String> result = IntStream.range(0, 1000).parallel()
+     *         .mapToObj(String::valueOf)
+     *         .collect(Collectors.toList());  // 使用收集器，线程安全
+     *
+     *
+     */
     Stream<T> peek(Consumer<? super T> action);
 
     /**
@@ -446,6 +542,48 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @param maxSize the number of elements the stream should be limited to
      * @return the new stream
      * @throws IllegalArgumentException if {@code maxSize} is negative
+     */
+    /**
+     * 返回由此流的元素组成的流，截断长度不超过 maxSize。
+     *
+     * 这是一个短路有状态中间操作。
+     *
+     * @apiNote
+     * 虽然 limit 在顺序流管道上通常是低成本操作，但在有序并行管道上可能相当昂贵，
+     * 尤其是对于较大的 maxSize 值，因为 limit(n) 被限制为返回的不仅仅是任意 n 个元素，
+     * 而是遭遇顺序中的前 n 个元素。使用无序流源（例如 generate 方法）或通过
+     * unordered 方法移除排序约束，如果语义允许，可能会显著提高 limit 在并行管道中的执行速度。
+     * 如果需要与遭遇顺序保持一致，且在并行管道中使用 limit 时遇到性能或内存利用率问题，
+     * 切换到顺序执行可能会改善性能。
+     *
+     * 示例：有序并行流的 limit 操作
+     *     // 有序并行流，limit 需要保持遭遇顺序
+     *     List<Integer> result1 = IntStream.range(0, 1000000).parallel()
+     *         .limit(10)
+     *         .boxed()
+     *         .collect(Collectors.toList());
+     *     // 结果: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] - 保持顺序，但性能开销大
+     *
+     * 示例：使用 unordered 提高性能
+     *     // 移除排序约束，允许返回任意 10 个元素
+     *     List<Integer> result2 = IntStream.range(0, 1000000).parallel()
+     *         .unordered()
+     *         .limit(10)
+     *         .boxed()
+     *         .collect(Collectors.toList());
+     *     // 结果: 任意 10 个元素，顺序不确定，但性能更好
+     *
+     * 示例：需要顺序一致性时改用顺序执行
+     *     // 并行流性能不佳时，切换到顺序执行
+     *     List<Integer> result3 = IntStream.range(0, 1000000)
+     *         .limit(10)  // 顺序流，性能稳定
+     *         .boxed()
+     *         .collect(Collectors.toList());
+     *     // 结果: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] - 保持顺序，性能可预测
+     *
+     * @param maxSize 流应该限制的元素数量
+     * @return 新的流
+     * @throws IllegalArgumentException 如果 maxSize 为负数
      */
     Stream<T> limit(long maxSize);
 
@@ -476,6 +614,37 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @return the new stream
      * @throws IllegalArgumentException if {@code n} is negative
      */
+    /**
+     * 返回由此流的元素组成的流，在丢弃流的前 n 个元素后，保留剩余的元素。
+     * 如果此流包含的元素少于 n 个，则返回空流。
+     *
+     * <p>这是一个有状态的中间操作。
+     *
+     * @apiNote
+     * 虽然 skip 在顺序流管道上通常是低成本操作，但在有序并行管道上可能相当昂贵，
+     * 尤其是对于较大的 n 值，因为 skip(n) 被限制为跳过的不仅仅是任意 n 个元素，
+     * 而是遭遇顺序中的前 n 个元素。使用无序流源（例如 generate 方法）或通过
+     * unordered 方法移除排序约束，如果语义允许，可能会显著提高 skip 在并行管道中的执行速度。
+     * 如果需要与遭遇顺序保持一致，且在并行管道中使用 skip 时遇到性能或内存利用率问题，
+     * 切换到顺序执行可能会改善性能。
+     *
+     * 示例：有序并行流的 skip 操作
+     *     List<Integer> result2 = IntStream.range(0, 1000000).parallel().skip(999990).boxed().collect(Collectors.toList());
+     *     // 结果: [999990, 999991, ..., 999999] - 需要跳过前 999990 个元素，性能开销大
+     *
+     * 示例：使用 unordered 提高性能
+     *     List<Integer> result3 = IntStream.range(0, 1000000).parallel().unordered().skip(999990).boxed().collect(Collectors.toList());
+     *     // 结果: 任意 10 个元素，顺序不确定，但性能更好
+     *
+     * 示例：需要顺序一致性时改用顺序执行
+     *     List<Integer> result4 = IntStream.range(0, 1000000).skip(999990).boxed().collect(Collectors.toList());
+     *     // 结果: [999990, 999991, ..., 999999] - 顺序流，性能稳定
+     *
+     *
+     * @param n 要跳过的前导元素数量
+     * @return 新的流
+     * @throws IllegalArgumentException 如果 n 为负数
+     */
     Stream<T> skip(long n);
 
     /**
@@ -495,6 +664,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @param action a <a href="package-summary.html#NonInterference">
      *               non-interfering</a> action to perform on the elements
      */
+    // 为流中的每一个元素执行action
     void forEach(Consumer<? super T> action);
 
     /**
@@ -514,6 +684,32 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *               non-interfering</a> action to perform on the elements
      * @see #forEach(Consumer)
      */
+    /**
+     * 对流中的每个元素执行操作，如果流有定义的遭遇顺序，则按照遭遇顺序执行。
+     *
+     * <p>这是一个终端操作。
+     *
+     * <p>此操作一次处理一个元素，如果存在遭遇顺序则按顺序处理。
+     * 对一个元素执行操作发生在对后续元素执行操作之前，
+     * 但对于任何给定的元素，操作可能在库选择的任何线程中执行。
+     *
+     * 示例：顺序执行操作
+     *     List<String> list = Arrays.asList("a", "b", "c", "d");
+     *     list.stream().forEachOrdered(System.out::println);
+     *     // 输出: a, b, c, d（按顺序输出）
+     *
+     * 示例：并行流保持顺序
+     *     List<Integer> list2 = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8);
+     *     list2.parallelStream().forEachOrdered(e -> System.out.print(e + " "));
+     *     // 输出: 1 2 3 4 5 6 7 8（即使并行执行，也保持遭遇顺序）
+     *
+     * 示例：与 forEach 对比
+     *     list2.parallelStream().forEach(e -> System.out.print(e + " "));
+     *     // 输出: 顺序不确定（可能不是 1 2 3 4 5 6 7 8）
+     *
+     * @param action 在流元素上执行的操作
+     * @see #forEach(Consumer)
+     */
     void forEachOrdered(Consumer<? super T> action);
 
     /**
@@ -524,6 +720,7 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *
      * @return an array containing the elements of this stream
      */
+    // 返回包含流中所有元素的对象数组
     Object[] toArray();
 
     /**
@@ -644,6 +841,47 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @see #min(Comparator)
      * @see #max(Comparator)
      */
+    /**
+     * 归约操作（Reduction）：就是将多个元素"折叠"或"聚合"成一个单一的值
+     * 对流中的元素执行归约操作，使用关联的累加函数，返回描述归约值的 Optional（如果有的话）。
+     * 等效于以下伪代码：
+     *     boolean foundAny = false;
+     *     T result = null;
+     *     for (T element : this stream) {
+     *         if (!foundAny) {
+     *             foundAny = true;
+     *             result = element;
+     *         }
+     *         else
+     *             result = accumulator.apply(result, element);
+     *     }
+     *     return foundAny ? Optional.of(result) : Optional.empty();
+     *
+     * 但不局限于顺序执行。
+     *
+     * 累加器函数必须是关联函数(满足结合律的函数, 例如： f(f(a, b), c) = f(a, f(b, c)))
+     *
+     * 这是一个终端操作。
+     *
+     * 示例：计算流中元素的和
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Optional<Integer> sum = numbers.stream().reduce((a, b) -> a + b);
+     *     // sum = Optional[15]
+     *
+     * 示例：计算最大值
+     *     Optional<Integer> max = numbers.stream().reduce(Integer::max);
+     *     // max = Optional[5]
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     Optional<Integer> result = empty.stream().reduce((a, b) -> a + b);
+     *     // result = Optional.empty()
+     *
+     * @param accumulator 用于组合两个值的关联、非干扰、无状态函数
+     * @return 描述归约结果的 Optional
+     * @throws NullPointerException 如果归约结果为 null
+     * @see #reduce(Object, BinaryOperator)
+     */
     Optional<T> reduce(BinaryOperator<T> accumulator);
 
     /**
@@ -692,6 +930,72 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @return the result of the reduction
      * @see #reduce(BinaryOperator)
      * @see #reduce(Object, BinaryOperator)
+     */
+    /**
+     * 对流中的元素执行归约操作，使用提供的 identity、accumulator 和 combiner 函数。
+     * 对于顺序流，等效于以下伪代码：
+     *     U result = identity;
+     *     for (T element : this stream)
+     *         result = accumulator.apply(result, element)
+     *     return result;
+     *
+     * 对于并行流，combiner 函数用于合并不同线程的部分结果：
+     *     U result1 = identity;
+     *     U result2 = identity;
+     *     // 线程1处理前半部分
+     *     for (T element : partition1)
+     *         result1 = accumulator.apply(result1, element)
+     *     // 线程2处理后半部分
+     *     for (T element : partition2)
+     *         result2 = accumulator.apply(result2, element)
+     *     // 合并两个结果
+     *     return combiner.apply(result1, result2);
+     *
+     * 但不局限于顺序执行。
+     *
+     * identity 值必须是 combiner 函数的单位元。这意味着对于所有 u，
+     * combiner(identity, u) 等于 u。此外，combiner 函数必须与 accumulator 函数兼容；
+     * 对于所有 u 和 t，以下必须成立：
+     *     combiner.apply(u, accumulator.apply(identity, t)) == accumulator.apply(u, t)
+     *
+     * 这是一个终端操作。
+     *
+     * @apiNote 许多使用此形式的归约操作可以通过 map 和 reduce 操作的显式组合更简单地表示。
+     * accumulator 函数充当融合的映射器和累加器，有时比单独的映射和归约更高效，
+     * 例如当知道先前的归约值可以避免某些计算时。
+     *
+     * 示例：将字符串列表转换为单个字符串
+     *     List<String> words = Arrays.asList("Hello", " ", "World");
+     *     String result = words.stream().reduce(
+     *         "",
+     *         (acc, word) -> acc + word,
+     *         (acc1, acc2) -> acc1 + acc2
+     *     );
+     *     // result = "Hello World"
+     *
+     * 示例：计算列表中所有数字的和（类型转换）
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Integer sum = numbers.stream().reduce(
+     *         0,
+     *         (acc, num) -> acc + num,
+     *         (acc1, acc2) -> acc1 + acc2
+     *     );
+     *     // sum = 15
+     *
+     * 示例：并行流中的使用
+     *     List<String> list = Arrays.asList("a", "b", "c", "d");
+     *     String result2 = list.parallelStream().reduce(
+     *         "",
+     *         (acc, str) -> acc + str,
+     *         (acc1, acc2) -> acc1 + acc2  // 用于合并并行结果
+     *     );
+     *     // result2 = "abcd"
+     *
+     * @param <U> 结果的类型
+     * @param identity combiner 函数的单位元值
+     * @param accumulator 用于将额外元素合并到结果中的关联、非干扰、无状态函数
+     * @param combiner 用于合并两个值的关联、非干扰、无状态函数，必须与 accumulator 函数兼容
+     * @return 归约的结果
      */
     <U> U reduce(U identity,
                  BiFunction<U, ? super T, U> accumulator,
@@ -747,6 +1051,91 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *                    function for combining two values, which must be
      *                    compatible with the accumulator function
      * @return the result of the reduction
+     */
+    /**
+     * 对流中的元素执行可变归约操作。可变归约是指归约值是可变结果容器（如 ArrayList），
+     * 元素通过更新结果的状态而不是替换结果来合并。这产生的结果等效于：
+     *     R result = supplier.get();
+     *     for (T element : this stream)
+     *         accumulator.accept(result, element);
+     *     return result;
+     *
+     * 与 reduce(Object, BinaryOperator) 类似，collect 操作可以并行化，无需额外的同步。
+     *
+     * 这是一个终端操作。
+     *
+     * 示例：将字符串流收集到 ArrayList
+     *     List<String> result = stringStream.collect(
+     *         ArrayList::new,      // supplier - 创建新的 ArrayList
+     *         ArrayList::add,      // accumulator - 将元素添加到 ArrayList
+     *         ArrayList::addAll    // combiner - 合并两个 ArrayList
+     *     );
+     *
+     * 示例：将字符串流连接成单个字符串
+     *     String concat = stringStream.collect(
+     *         StringBuilder::new,       // supplier - 创建新的 StringBuilder
+     *         StringBuilder::append,    // accumulator - 追加字符串
+     *         StringBuilder::append     // combiner - 合并两个 StringBuilder
+     *     ).toString();
+     *
+     * 示例：计算流中元素的和
+     *     Integer sum = numbers.stream().collect(
+     *         () -> new int[1],                    // supplier - 创建长度为 1 的数组
+     *         (acc, num) -> acc[0] += num,         // accumulator - 累加
+     *         (acc1, acc2) -> acc1[0] += acc2[0]   // combiner - 合并结果
+     *     )[0];
+     *
+     * 示例：并行流中的使用
+     *     List<String> result = stringStream.parallelStream().collect(
+     *         ArrayList::new,
+     *         ArrayList::add,
+     *         ArrayList::addAll  // 并行执行时用于合并各线程的结果
+     *     );
+     *
+     * 并行执行伪代码（与顺序执行的区别）：
+     * 顺序执行：
+     *     R result = supplier.get();
+     *     for (T element : stream)
+     *         accumulator.accept(result, element);
+     *     return result;
+     *
+     * 并行执行：
+     *     // 将流分成多个分区
+     *     Partition partition1 = stream.partition1;  // 分区1
+     *     Partition partition2 = stream.partition2;  // 分区2
+     *     Partition partition3 = stream.partition3;  // 分区3
+     *
+     *     // 每个线程独立处理其分区
+     *     Thread1: R result1 = supplier.get();       // 调用 supplier 创建结果容器
+     *             for (T element : partition1)
+     *                 accumulator.accept(result1, element);
+     *
+     *     Thread2: R result2 = supplier.get();       // 调用 supplier 创建结果容器
+     *             for (T element : partition2)
+     *                 accumulator.accept(result2, element);
+     *
+     *     Thread3: R result3 = supplier.get();       // 调用 supplier 创建结果容器
+     *             for (T element : partition3)
+     *                 accumulator.accept(result3, element);
+     *
+     *     // 使用 combiner 合并各线程的结果
+     *     R combined = result1;
+     *     combiner.accept(combined, result2);  // 合并 result2 到 combined
+     *     combiner.accept(combined, result3);  // 合并 result3 到 combined
+     *     return combined;
+     *
+     * 关键点：
+     * - supplier 在并行执行时会被调用多次（每个线程一次），创建独立的结果容器
+     * - 每个线程使用 accumulator 处理其分区的元素，互不干扰
+     * - combiner 函数负责将各线程的结果合并为最终结果
+     * - 由于每个线程有独立的结果容器，无需额外的同步机制
+     *
+     * @param <R> 结果的类型
+     * @param supplier 创建新结果容器的函数。对于并行执行，此函数可能被调用多次，
+     *                 每次都必须返回一个新鲜值
+     * @param accumulator 用于将额外元素合并到结果中的关联、非干扰、无状态函数
+     * @param combiner 用于合并两个值的关联、非干扰、无状态函数，必须与 accumulator 函数兼容
+     * @return 归约的结果
      */
     <R> R collect(Supplier<R> supplier,
                   BiConsumer<R, ? super T> accumulator,
@@ -804,6 +1193,68 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @see #collect(Supplier, BiConsumer, BiConsumer)
      * @see Collectors
      */
+    /**
+     * 使用 Collector 对流中的元素执行可变归约操作。Collector 封装了用作
+     * collect(Supplier, BiConsumer, BiConsumer) 参数的函数，允许重用收集策略
+     * 和组合收集操作，如多级分组或分区。
+     *
+     * 如果流是并行的，且 Collector 是并发的，并且流是无序的或收集器是无序的，
+     * 则将执行并发归约。
+     *
+     * 这是一个终端操作。
+     *
+     * 在并行执行时，可能会实例化、填充和合并多个中间结果，以保持可变数据结构的隔离。
+     * 因此，即使与非线程安全的数据结构（如 ArrayList）并行执行，并行归约也不需要额外的同步。
+     *
+     * 示例：并行流的并发归约（无需额外同步）
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+     *     // 并行流自动处理线程安全，无需手动同步
+     *     List<Integer> result = numbers.parallelStream()
+     *         .collect(Collectors.toList());
+     *     // result = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+     *     // 多个线程各自创建独立的 ArrayList，最后合并，无需同步
+     *
+     * 示例：并行流的分组操作
+     *     List<String> words = Arrays.asList("apple", "apricot", "banana", "blueberry", "cherry");
+     *     Map<Character, List<String>> groupedByFirstLetter = words.parallelStream()
+     *         .collect(Collectors.groupingBy(word -> word.charAt(0)));
+     *     // 并行执行分组，Collector 自动处理并发
+     *     // groupedByFirstLetter = {
+     *     //   'a': [apple, apricot],
+     *     //   'b': [banana, blueberry],
+     *     //   'c': [cherry]
+     *     // }
+     *
+     * 示例：顺序流 vs 并行流
+     *     List<Integer> largeList = IntStream.range(0, 1000000).boxed().collect(Collectors.toList());
+     *     // 顺序流 - 单线程处理
+     *     List<Integer> seq = largeList.stream().collect(Collectors.toList());
+     *     // 并行流 - 多线程处理，自动分割和合并
+     *     List<Integer> par = largeList.parallelStream().collect(Collectors.toList());
+     *
+     * 示例：将字符串流收集到列表
+     *     List<String> list = Arrays.asList("apple", "banana", "cherry");
+     *     List<String> result = list.stream().collect(Collectors.toList());
+     *     // result = [apple, banana, cherry]
+     *
+     * 示例：按城市分组 Person 对象
+     *     List<Person> people = Arrays.asList(
+     *         new Person("Alice", "New York"),
+     *         new Person("Bob", "Los Angeles"),
+     *         new Person("Charlie", "New York")
+     *     );
+     *     Map<String, List<Person>> peopleByCity = people.stream()
+     *         .collect(Collectors.groupingBy(Person::getCity));
+     *     // peopleByCity = {
+     *     //   "New York": [Alice, Charlie],
+     *     //   "Los Angeles": [Bob]
+     *     // }
+     *
+     * @param <R> 结果的类型
+     * @param <A> Collector 的中间累加类型
+     * @param collector 描述归约的 Collector
+     * @return 归约的结果
+     */
     <R, A> R collect(Collector<? super T, A, R> collector);
 
     /**
@@ -820,22 +1271,76 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * or an empty {@code Optional} if the stream is empty
      * @throws NullPointerException if the minimum element is null
      */
+    /**
+     * 根据提供的比较器返回此流的最小元素。这是规约操作的特殊情况。
+     *
+     * <p>这是一个终端操作。
+     *
+     * 示例：找到列表中最小的数字
+     *     List<Integer> numbers = Arrays.asList(5, 2, 8, 1, 9, 3);
+     *     Optional<Integer> min = numbers.stream().min(Integer::compareTo);
+     *     // min = Optional[1]
+     *
+     * 示例：找到最短的字符串
+     *     List<String> words = Arrays.asList("apple", "pie", "banana");
+     *     Optional<String> shortest = words.stream().min(Comparator.comparingInt(String::length));
+     *     // shortest = Optional[pie]
+     *
+     * 示例：找到自定义对象的最小值
+     *     List<Person> people = Arrays.asList(
+     *         new Person("Alice", 25),
+     *         new Person("Bob", 20),
+     *         new Person("Charlie", 30)
+     *     );
+     *     Optional<Person> youngest = people.stream().min(Comparator.comparingInt(Person::getAge));
+     *     // youngest = Optional[Bob (age 20)]
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     Optional<Integer> result = empty.stream().min(Integer::compareTo);
+     *     // result = Optional.empty()
+     *
+     * @param comparator 用于比较流中元素的非干扰、无状态比较器
+     * @return 描述此流的最小元素的 Optional，如果流为空则返回空 Optional
+     * @throws NullPointerException 如果最小元素为 null
+     */
     Optional<T> min(Comparator<? super T> comparator);
 
     /**
-     * Returns the maximum element of this stream according to the provided
-     * {@code Comparator}.  This is a special case of a
-     * <a href="package-summary.html#Reduction">reduction</a>.
-     *
-     * <p>This is a <a href="package-summary.html#StreamOps">terminal
-     * operation</a>.
-     *
-     * @param comparator a <a href="package-summary.html#NonInterference">non-interfering</a>,
-     *                   <a href="package-summary.html#Statelessness">stateless</a>
-     *                   {@code Comparator} to compare elements of this stream
-     * @return an {@code Optional} describing the maximum element of this stream,
-     * or an empty {@code Optional} if the stream is empty
      * @throws NullPointerException if the maximum element is null
+     */
+    /**
+     * 根据提供的比较器返回此流的最大元素。这是规约操作的特殊情况。
+     *
+     * <p>这是一个终端操作。
+     *
+     * 示例：找到列表中最大的数字
+     *     List<Integer> numbers = Arrays.asList(5, 2, 8, 1, 9, 3);
+     *     Optional<Integer> max = numbers.stream().max(Integer::compareTo);
+     *     // max = Optional[9]
+     *
+     * 示例：找到最长的字符串
+     *     List<String> words = Arrays.asList("apple", "pie", "banana");
+     *     Optional<String> longest = words.stream().max(Comparator.comparingInt(String::length));
+     *     // longest = Optional[banana]
+     *
+     * 示例：找到自定义对象的最大值
+     *     List<Person> people = Arrays.asList(
+     *         new Person("Alice", 25),
+     *         new Person("Bob", 20),
+     *         new Person("Charlie", 30)
+     *     );
+     *     Optional<Person> oldest = people.stream().max(Comparator.comparingInt(Person::getAge));
+     *     // oldest = Optional[Charlie (age 30)]
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     Optional<Integer> result = empty.stream().max(Integer::compareTo);
+     *     // result = Optional.empty()
+     *
+     * @param comparator 用于比较流中元素的非干扰、无状态比较器
+     * @return 描述此流的最大元素的 Optional，如果流为空则返回空 Optional
+     * @throws NullPointerException 如果最大元素为 null
      */
     Optional<T> max(Comparator<? super T> comparator);
 
@@ -851,6 +1356,8 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *
      * @return the count of elements in this stream
      */
+    // 返回流中元素数量，这是一个特殊的规约函数，等价于
+    // return mapToLong(e -> 1L).sum();
     long count();
 
     /**
@@ -871,6 +1378,30 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      *                  predicate to apply to elements of this stream
      * @return {@code true} if any elements of the stream match the provided
      * predicate, otherwise {@code false}
+     */
+    /**
+     * 返回此流中是否有任何元素与提供的谓词匹配。如果不需要评估所有元素来确定结果，
+     * 则可能不会评估所有元素上的谓词。如果流为空，则返回 false，且不评估谓词。
+     *
+     * <p>这是一个短路终端操作。
+     *
+     * 示例：检查是否有偶数
+     *     List<Integer> numbers = Arrays.asList(1, 3, 5, 7, 8, 9);
+     *     boolean hasEven = numbers.stream().anyMatch(n -> n % 2 == 0);
+     *     // hasEven = true（找到 8 后立即返回，不继续检查）
+     *
+     * 示例：检查是否有空字符串
+     *     List<String> words = Arrays.asList("apple", "banana", "", "cherry");
+     *     boolean hasEmpty = words.stream().anyMatch(String::isEmpty);
+     *     // hasEmpty = true
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     boolean result = empty.stream().anyMatch(n -> n > 0);
+     *     // result = false
+     *
+     * @param predicate 应用于流元素的非干扰、无状态谓词
+     * @return 如果流中有任何元素与提供的谓词匹配，则返回 true，否则返回 false
      */
     boolean anyMatch(Predicate<? super T> predicate);
 
@@ -895,6 +1426,30 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @return {@code true} if either all elements of the stream match the
      * provided predicate or the stream is empty, otherwise {@code false}
      */
+    /**
+     * 返回此流中是否所有元素都与提供的谓词匹配。如果不需要评估所有元素来确定结果，
+     * 则可能不会评估所有元素上的谓词。如果流为空，则返回 true，且不评估谓词。
+     *
+     * <p>这是一个短路终端操作。
+     *
+     * 示例：检查是否所有数字都是正数
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     boolean allPositive = numbers.stream().allMatch(n -> n > 0);
+     *     // allPositive = true
+     *
+     * 示例：检查是否所有字符串都非空
+     *     List<String> words = Arrays.asList("apple", "banana", "", "cherry");
+     *     boolean allNonEmpty = words.stream().allMatch(s -> !s.isEmpty());
+     *     // allNonEmpty = false（找到空字符串后立即返回）
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     boolean result = empty.stream().allMatch(n -> n > 0);
+     *     // result = true（空流时总是返回 true）
+     *
+     * @param predicate 应用于流元素的非干扰、无状态谓词
+     * @return 如果流中所有元素都与提供的谓词匹配或流为空，则返回 true，否则返回 false
+     */
     boolean allMatch(Predicate<? super T> predicate);
 
     /**
@@ -918,6 +1473,30 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @return {@code true} if either no elements of the stream match the
      * provided predicate or the stream is empty, otherwise {@code false}
      */
+    /**
+     * 返回此流中是否没有任何元素与提供的谓词匹配。如果不需要评估所有元素来确定结果，
+     * 则可能不会评估所有元素上的谓词。如果流为空，则返回 true，且不评估谓词。
+     *
+     * <p>这是一个短路终端操作。
+     *
+     * 示例：检查是否没有负数
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     boolean noNegative = numbers.stream().noneMatch(n -> n < 0);
+     *     // noNegative = true
+     *
+     * 示例：检查是否没有空字符串
+     *     List<String> words = Arrays.asList("apple", "banana", "", "cherry");
+     *     boolean noEmpty = words.stream().noneMatch(String::isEmpty);
+     *     // noEmpty = false（找到空字符串后立即返回）
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     boolean result = empty.stream().noneMatch(n -> n < 0);
+     *     // result = true（空流时总是返回 true）
+     *
+     * @param predicate 应用于流元素的非干扰、无状态谓词
+     * @return 如果流中没有任何元素与提供的谓词匹配或流为空，则返回 true，否则返回 false
+     */
     boolean noneMatch(Predicate<? super T> predicate);
 
     /**
@@ -931,6 +1510,37 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @return an {@code Optional} describing the first element of this stream,
      * or an empty {@code Optional} if the stream is empty
      * @throws NullPointerException if the element selected is null
+     */
+    /**
+     * 返回描述此流的第一个元素的 Optional，如果流为空则返回空 Optional。
+     * 如果流没有定义遭遇顺序，则可能返回任何元素。
+     *
+     * <p>这是一个短路终端操作。
+     *
+     * 示例：找到列表中的第一个元素
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Optional<Integer> first = numbers.stream().findFirst();
+     *     // first = Optional[1]
+     *
+     * 示例：找到满足条件的第一个元素
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Optional<Integer> firstEven = numbers.stream()
+     *         .filter(n -> n % 2 == 0)
+     *         .findFirst();
+     *     // firstEven = Optional[2]
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     Optional<Integer> result = empty.stream().findFirst();
+     *     // result = Optional.empty()
+     *
+     * 示例：并行流中的 findFirst
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Optional<Integer> first = numbers.parallelStream().findFirst();
+     *     // first = Optional[1]（总是返回第一个元素，即使是并行流）
+     *
+     * @return 描述此流的第一个元素的 Optional，如果流为空则返回空 Optional
+     * @throws NullPointerException 如果选中的元素为 null
      */
     Optional<T> findFirst();
 
@@ -950,6 +1560,42 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
      * @return an {@code Optional} describing some element of this stream, or an
      * empty {@code Optional} if the stream is empty
      * @throws NullPointerException if the element selected is null
+     * @see #findFirst()
+     */
+    /**
+     * 返回描述流中某个元素的 Optional，如果流为空则返回空 Optional。
+     *
+     * <p>这是一个短路终端操作。
+     *
+     * <p>此操作的行为是显式非确定性的；它可以自由选择流中的任何元素。
+     * 这是为了在并行操作中获得最大性能；代价是对同一源的多次调用可能不会返回相同的结果。
+     * （如果需要稳定的结果，请改用 findFirst()。）
+     *
+     * 示例：找到列表中的任意元素
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Optional<Integer> any = numbers.stream().findAny();
+     *     // any = Optional[1]（可能是任何元素）
+     *
+     * 示例：找到满足条件的任意元素
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Optional<Integer> anyEven = numbers.stream()
+     *         .filter(n -> n % 2 == 0)
+     *         .findAny();
+     *     // anyEven = Optional[2] 或 Optional[4]（任意偶数）
+     *
+     * 示例：空流的情况
+     *     List<Integer> empty = Arrays.asList();
+     *     Optional<Integer> result = empty.stream().findAny();
+     *     // result = Optional.empty()
+     *
+     * 示例：并行流中的 findAny（性能更好）
+     *     List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+     *     Optional<Integer> any = numbers.parallelStream().findAny();
+     *     // any = Optional[任意元素]（可能是 1、2、3、4 或 5）
+     *     // 并行流中，findAny 比 findFirst 性能更好，因为不需要保证顺序
+     *
+     * @return 描述流中某个元素的 Optional，如果流为空则返回空 Optional
+     * @throws NullPointerException 如果选中的元素为 null
      * @see #findFirst()
      */
     Optional<T> findAny();
