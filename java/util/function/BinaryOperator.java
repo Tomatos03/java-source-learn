@@ -42,6 +42,10 @@ import java.util.Comparator;
  * @see UnaryOperator
  * @since 1.8
  */
+ /**
+  * 原始BiFunction 定义：interface BiFunction<T, U, R>
+  *
+  */
 @FunctionalInterface
 public interface BinaryOperator<T> extends BiFunction<T,T,T> {
     /**
@@ -54,6 +58,7 @@ public interface BinaryOperator<T> extends BiFunction<T,T,T> {
      *         according to the supplied {@code Comparator}
      * @throws NullPointerException if the argument is null
      */
+     // 返回给定两个元素较小的一方，如果相等返回第一个元素
     public static <T> BinaryOperator<T> minBy(Comparator<? super T> comparator) {
         Objects.requireNonNull(comparator);
         return (a, b) -> comparator.compare(a, b) <= 0 ? a : b;
@@ -69,6 +74,7 @@ public interface BinaryOperator<T> extends BiFunction<T,T,T> {
      *         according to the supplied {@code Comparator}
      * @throws NullPointerException if the argument is null
      */
+    // 返回给定两个元素较大的一方，如果相等返回第一个元素
     public static <T> BinaryOperator<T> maxBy(Comparator<? super T> comparator) {
         Objects.requireNonNull(comparator);
         return (a, b) -> comparator.compare(a, b) >= 0 ? a : b;
