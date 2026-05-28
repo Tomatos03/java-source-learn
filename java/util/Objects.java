@@ -33,8 +33,13 @@ import java.util.function.Supplier;
  * null}-tolerant methods for computing the hash code of an object,
  * returning a string for an object, and comparing two objects.
  *
+ *
  * @since 1.7
  */
+ /**
+  *
+  * 此类包含用于操作对象的静态工具方法。
+  */
 public final class Objects {
     private Objects() {
         throw new AssertionError("No java.util.Objects instances for you!");
@@ -55,6 +60,9 @@ public final class Objects {
      * and {@code false} otherwise
      * @see Object#equals(Object)
      */
+    // 对比相同的情况：
+    // - 两个对象地址相等
+    // - a对象不为null且a.equals(b)为true
     public static boolean equals(Object a, Object b) {
         return (a == b) || (a != null && a.equals(b));
     }
@@ -94,6 +102,7 @@ public final class Objects {
      * a {@code null} argument
      * @see Object#hashCode
      */
+    // 空对象的hash总是0，非空对象hash通过继承至object类的hashcode方法得来
     public static int hashCode(Object o) {
         return o != null ? o.hashCode() : 0;
     }
@@ -155,7 +164,8 @@ public final class Objects {
      * otherwise.
      * @see Objects#toString(Object)
      */
-    public static String toString(Object o, String nullDefault) {
+     // 如果对象不为null，返回其toString结果；否则返回nullDefault
+     public static String toString(Object o, String nullDefault) {
         return (o != null) ? o.toString() : nullDefault;
     }
 
@@ -179,6 +189,7 @@ public final class Objects {
      * @see Comparable
      * @see Comparator
      */
+    // 比较两个对象的大小，使用指定的Comparator进行比较
     public static <T> int compare(T a, T b, Comparator<? super T> c) {
         return (a == b) ? 0 :  c.compare(a, b);
     }
@@ -198,6 +209,7 @@ public final class Objects {
      * @return {@code obj} if not {@code null}
      * @throws NullPointerException if {@code obj} is {@code null}
      */
+    // 如果对象为null，抛出NullPointerException；否则返回对象本身
     public static <T> T requireNonNull(T obj) {
         if (obj == null)
             throw new NullPointerException();
@@ -223,6 +235,8 @@ public final class Objects {
      * @return {@code obj} if not {@code null}
      * @throws NullPointerException if {@code obj} is {@code null}
      */
+     // 如果对象为null，抛出NullPointerException；否则返回对象本身
+     // message方法参数指定抛出异常的内容
     public static <T> T requireNonNull(T obj, String message) {
         if (obj == null)
             throw new NullPointerException(message);
