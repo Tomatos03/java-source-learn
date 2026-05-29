@@ -261,7 +261,42 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * The default initial capacity - MUST be a power of two.
      */
-    static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // 默认的初始容量 16
+    /*
+     * 默认初始容量16（1 << 4 = 16），选择这个值的设计含义：
+     *
+     * 【为什么必须是2的幂？】
+     * 1. 哈希定位使用位运算：index = (n-1) & hash
+     *    - 这要求n必须是2的幂，否则 (n-1) 的二进制表示不是全1
+     *    - 例如：n=16时，n-1=15=0b1111，可以保证每个桶都有机会被使用
+     *    - 如果n=15，n-1=14=0b1110，最后一位永远是0，某些桶永远不会被使用
+     *
+     * 2. 扩容时容量翻倍：n → 2n
+     *    - 新的 (2n-1) 比 (n-1) 多一个高位1
+     *    - 元素要么在原位置，要么在原位置+原容量
+     *    - 这样可以高效地重新分配元素，不需要重新计算哈希
+     *
+     * 【为什么默认是16？】
+     *  经验值：16是时间和空间的平衡点
+     *    - 太小（如4）：扩容太频繁，影响性能
+     *    - 太大（如256）：浪费空间，初始化慢
+     *
+     *
+     * 【如何选择合适的初始容量？】
+     * 公式：初始容量 = 预期元素数量 / 负载因子
+     * 然后取最近的2的幂
+     *
+     * 【扩容的代价】
+     * 扩容需要：
+     * 1. 创建新的数组（2倍大小）
+     * 2. 遍历旧数组的所有元素
+     * 3. 重新计算每个元素的位置（虽然可以用位运算优化）
+     * 4. 释放旧数组
+     *
+     * 因此，如果能提前知道元素数量，应该设置合适的初始容量以避免扩容
+     *
+     *
+     */
+    static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // 2^4 = 16
 
     /**
      * The maximum capacity, used if a higher value is implicitly specified
@@ -273,7 +308,34 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * The load factor used when none specified in constructor.
      */
-    static final float DEFAULT_LOAD_FACTOR = 0.75f; // 默认的容量增长因子0.75
+    /*
+     * 默认负载因子0.75，选择这个值是时间和空间成本之间的最佳权衡：
+     *
+     * 【时间与空间的权衡】
+     * - 负载因子越高 → 空间利用率越高（桶更满）→ 但查找效率下降（桶内节点多）
+     * - 负载因子越低 → 查找效率越高（桶内节点少）→ 但空间浪费越严重（桶经常空着）
+     *
+     * 【为什么不是0.5？】
+     * - 空间浪费太严重：只使用了50%的桶，其余50%空着
+     * - 扩容太频繁：每插入2个元素就可能需要扩容一次
+     * - 虽然查找效率高，但空间成本太高
+     *
+     * 【为什么不是1.0？】
+     * - 查找效率下降：所有桶都被填满，链表/红黑树会很长
+     * - 虽然空间利用率高，但时间成本太高
+     *
+     * 【0.75的数学依据】
+     * 在负载因子0.75的情况下，每个桶的节点数量服从泊松分布. 桶中元素数量超过8的概率为千万分之0.6，极低，几乎不会触发树化机制。
+     *
+     * 【设计哲学】
+     * 0.75在空间浪费和查找效率之间达到了最优平衡：
+     * 1. 空间不会太浪费（不像0.5那样浪费50%）
+     * 2. 查找效率不会太低（不像1.0那样桶很长）
+     * 3. 扩容频率适中（不像0.5那样频繁扩容）
+     * 4. 链表长度极短，红黑树几乎不需要使用
+     *
+     */
+    static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     /**
      * The bin count threshold for using a tree rather than list for a
@@ -283,7 +345,35 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * tree removal about conversion back to plain bins upon
      * shrinkage.
      */
-    // 当链表的节点数达到树化阈值时, 将链表进行树化
+    /*
+     * 链表转红黑树的阈值，选择8的原因基于泊松分布的数学证明：
+     *
+     * 泊松分布用于描述在固定时间或空间区间内，
+     *
+     * 在负载因子0.75的情况下，每个桶中节点数量服从泊松分布，参数λ≈0.5。
+     * 这意味着大部分桶只有0-2个节点，超过8个节点的概率极低。
+     *
+     * 各节点数量的概率：
+     * 0个节点: 60.65% (大部分桶是空的)
+     * 1个节点: 30.33%
+     * 2个节点: 7.58%
+     * 3个节点: 1.26%
+     * 4个节点: 0.16%
+     * 5个节点: 0.016%
+     * 6个节点: 0.0013%
+     * 7个节点: 0.000094%
+     * 8个节点: 0.000006% (千万分之0.6)
+     * ≥8个节点: <0.000001% (少于千万分之一)
+     *
+     * 选择8的原因：
+     * 1. 桶中有8个节点的概率极低（千万分之0.6），正常使用几乎不会触发树化
+     * 2. 只有在哈希函数设计极差或遭受哈希碰撞攻击时才会出现
+     * 3. 树化是"应急机制"，为极端情况提供O(log n)的最坏情况性能保证
+     * 4. TreeNode大小是普通Node的2倍，8是空间和性能的平衡点
+     * 5. 如果阈值太小（如4）会浪费空间，太大（如16）会导致链表过长性能下降
+     *
+     * 设计哲学：默认使用简单高效的链表，仅在极端情况下使用红黑树作为性能保险
+     */
     static final int TREEIFY_THRESHOLD = 8;
 
     /**
@@ -291,13 +381,51 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * resize operation. Should be less than TREEIFY_THRESHOLD, and at
      * most 6 to mesh with shrinkage detection under removal.
      */
-    static final int UNTREEIFY_THRESHOLD = 6;
+    /*
+     * 红黑树退化为链表的阈值，选择6的原因：
+     *
+     * 1. 必须小于TREEIFY_THRESHOLD(8)，避免频繁的树化和去树化切换
+     * 2. 选择6而不是7的原因：
+     *    - 如果选择7，删除一个节点后变为6，再插入一个又变为7，可能导致频繁转换
+     *    - 选择6提供了一个"缓冲区"，避免在7和8之间反复切换
+     * 3. 与树移除时的收缩检测机制配合：
+     *    - 树节点数量≤6时退化为链表
+     *    - 链表节点数量≥8时树化
+     *    - 中间有2个节点的缓冲空间(7和8)
+     * 4. 性能考虑：
+     *    - 链表在节点数≤6时性能已经足够好
+     *    - 红黑树的维护成本在节点数少时不划算
+     *
+     * 设计哲学：通过滞后(hysteresis)机制避免频繁的结构转换
+     */
+     // 链表节点数量达到阈值，将链表去树化
+     static final int UNTREEIFY_THRESHOLD = 6;
 
     /**
      * The smallest table capacity for which bins may be treeified.
      * (Otherwise the table is resized if too many nodes in a bin.)
      * Should be at least 4 * TREEIFY_THRESHOLD to avoid conflicts
      * between resizing and treeification thresholds.
+     */
+    /*
+     * 允许树化的最小容量，选择64的原因：
+     *
+     * 1. 计算：4 * TREEIFY_THRESHOLD = 4 * 8 = 32，但实际选择64
+     * 2. 为什么是64而不是32：
+     *    - 如果容量太小（如32），树化的收益不大
+     *    - 小容量时扩容比树化更有效
+     *    - 64是一个平衡点，树化开始有明显收益
+     *
+     * 3. 避免扩容和树化的冲突：
+     *    - 如果桶节点数达到8且容量<64，优先扩容而不是树化
+     *    - 扩容后桶节点数会减少，可能不需要树化
+     *    - 树化是最后的手段
+     *
+     * 4. 空间效率：
+     *    - 小容量时树化的空间开销不划算
+     *    - 64容量时，平均每个桶1个节点，树化是特殊情况
+     *
+     * 设计哲学：先扩容，后树化，树化是最后的性能保险
      */
     static final int MIN_TREEIFY_CAPACITY = 64;
 
