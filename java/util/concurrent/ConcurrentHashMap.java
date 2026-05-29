@@ -666,20 +666,46 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /* ---------------- Static utilities -------------- */
 
     /**
-     * Spreads (XORs) higher bits of hash to lower and also forces top
-     * bit to 0. Because the table uses power-of-two masking, sets of
-     * hashes that vary only in bits above the current mask will
-     * always collide. (Among known examples are sets of Float keys
-     * holding consecutive whole numbers in small tables.)  So we
-     * apply a transform that spreads the impact of higher bits
-     * downward. There is a tradeoff between speed, utility, and
-     * quality of bit-spreading. Because many common sets of hashes
-     * are already reasonably distributed (so don't benefit from
-     * spreading), and because we use trees to handle large sets of
-     * collisions in bins, we just XOR some shifted bits in the
-     * cheapest possible way to reduce systematic lossage, as well as
-     * to incorporate impact of the highest bits that would otherwise
-     * never be used in index calculations because of table bounds.
+     * 哈希值扰动函数
+     *
+     * 将哈希值的高位（高16位）与低位（低16位）进行异或运算，
+     * 同时强制将最高位（符号位）设为0。
+     *
+     * 【为什么需要扰动？】
+     * 由于HashMap使用2的幂次作为数组长度，定位桶的公式为：
+     *   index = (n-1) & hash
+     *
+     * 这意味着只有哈希值的低n位会参与索引计算。
+     * 如果多组哈希值只在高位不同，低位相同，它们会产生哈希冲突。
+     *
+     * 【典型示例】
+     * 当数组长度较小时（如16），如果有一组Float键存储连续整数：
+     * - 例如：0.0f, 1.0f, 2.0f, 3.0f...
+     * - 它们的hashCode值分别是：0, 1065353216, 1073741824...
+     * - 这些值的低4位都是0，会导致所有键都映射到同一个桶
+     *
+     * 【扰动的作用】
+     * 通过将高位与低位异或，可以让高位也参与索引计算：
+     * - 扰动前：高位变化不影响低位
+     * - 扰动后：高位的变化会扩散到低位
+     *
+     * 【设计权衡】
+     * 1. 速度：使用最简单的XOR运算，成本极低
+     * 2. 效果：足以减少常见的系统性哈希冲突
+     * 3. 不需要完美：因为有红黑树处理大量冲突的场景
+     *
+     * 【为什么只异或一次？】
+     * - 很多常见的哈希值已经分布均匀，不需要复杂的扰动
+     * - 使用树结构（红黑树）处理极端情况
+     * - 扰动的目的是减少"系统性丢失"，而不是追求完美分布
+     *
+     * 【与HashMap的spread方法对比】
+     * ConcurrentHashMap的spread方法与HashMap完全相同：
+     *   (h ^ (h >>> 16)) & HASH_BITS
+     *
+     * 其中 HASH_BITS = 0x7fffffff，用于清除符号位，保证结果为正数。
+     *
+     * 参考：HashMap类的hash()方法
      */
     static final int spread(int h) {
         return (h ^ (h >>> 16)) & HASH_BITS;
@@ -755,6 +781,18 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         return (Node<K,V>)U.getObjectVolatile(tab, ((long)i << ASHIFT) + ABASE);
     }
 
+    /**
+     *  CAS操作 - 原子地更新哈希表中指定位置的节点
+     *
+     *
+     * @param tab  哈希表数组（要操作的目标数组）
+     * @param i    数组索引位置（要更新的位置）
+     * @param c    预期值（expected）- 期望当前值等于这个值
+     * @param v    新值（update）- 如果当前值等于预期值，则更新为这个值
+     *
+     * @return     true: 更新成功（当前值 == 预期值）
+     *             false: 更新失败（当前值 != 预期值）
+     */
     static final <K,V> boolean casTabAt(Node<K,V>[] tab, int i,
                                         Node<K,V> c, Node<K,V> v) {
         return U.compareAndSwapObject(tab, ((long)i << ASHIFT) + ABASE, c, v);
@@ -933,7 +971,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      */
     public V get(Object key) {
         Node<K,V>[] tab; Node<K,V> e, p; int n, eh; K ek;
-        int h = spread(key.hashCode());
+        int h = spread(key.hashCode()); // key根据hashCode计算哈希值, 并进行扰动.
         if ((tab = table) != null && (n = tab.length) > 0 &&
             (e = tabAt(tab, (n - 1) & h)) != null) {
             if ((eh = e.hash) == h) {
@@ -1006,9 +1044,68 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         return putVal(key, value, false);
     }
 
+    /**
+     * 【中文注释】putVal - 插入键值对的核心实现方法
+     *
+     * 这是put()和putIfAbsent()方法的核心实现，负责向ConcurrentHashMap中插入键值对。
+     *
+     * 【方法参数】
+     * @param key          要插入的键（不能为null）
+     * @param value        要插入的值（不能为null）
+     * @param onlyIfAbsent true: 只有当key不存在时才插入（putIfAbsent）
+     *                     false: 如果key已存在则覆盖（put）
+     *
+     * @return 如果key已存在，返回旧值；否则返回null
+     *
+     * 【整体流程】
+     *
+     * ┌─────────────────────────────────────────────────────────────┐
+     * │                     putVal执行流程                          │
+     * ├─────────────────────────────────────────────────────────────┤
+     * │                                                             │
+     * │  1. 验证参数（key和value都不能为null）                      │
+     * │           ↓                                                 │
+     * │  2. 计算哈希值：hash = spread(key.hashCode())               │
+     * │           ↓                                                 │
+     * │  3. 进入无限循环（for (Node<K,V>[] tab = table;;)）         │
+     * │           ↓                                                 │
+     * │  4. 检查表是否为空 → 是：初始化表                            │
+     * │           ↓                                                 │
+     * │  5. 计算桶位置：i = (n-1) & hash                           │
+     * │           ↓                                                 │
+     * │  6. 桶为空？ → 是：CAS尝试插入                              │
+     * │           ↓                                                 │
+     * │     ┌─────┴─────┐                                          │
+     * │     ↓           ↓                                          │
+     * │   CAS成功     CAS失败                                      │
+     * │     ↓           ↓                                          │
+     * │   break     继续循环                                       │
+     * │               ↓                                             │
+     * │           下一轮：tab[i]不为空                              │
+     * │               ↓                                             │
+     * │  7. 桶不为空 → 检查是否在扩容                               │
+     * │           ↓                                                 │
+     * │  8. 加锁 synchronized(f)                                   │
+     * │           ↓                                                 │
+     * │  9. 插入到链表或红黑树                                      │
+     * │           ↓                                                 │
+     * │ 10. 检查是否需要树化                                        │
+     * │           ↓                                                 │
+     * │ 11. 更新计数器                                              │
+     * │                                                             │
+     * └─────────────────────────────────────────────────────────────┘
+     *
+     * 【性能优化】
+     * 1. 无锁快速路径：空桶CAS插入，无需加锁
+     * 2. 细粒度锁：只锁单个桶，不锁整个表
+     * 3. 树化：链表过长时转为红黑树，提高查询效率
+     *
+     */
     /** Implementation for put and putIfAbsent */
     final V putVal(K key, V value, boolean onlyIfAbsent) {
+        // key or value都不能为null
         if (key == null || value == null) throw new NullPointerException();
+        // 将hash值进行抖动运算
         int hash = spread(key.hashCode());
         int binCount = 0;
         for (Node<K,V>[] tab = table;;) {
@@ -1019,7 +1116,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
             // 节点数组对应的位置没有任何节点
             // (n - 1) & hash 计算出节点数组对应的位置, 位置保证在数组范围内
             else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
-                // cas 保证多个线程饿尝试放的时候, 仅有一个线程能够在节点数组某个位置初始化节点成功
+                // cas 保证多个线程尝试放的时候, 仅有一个线程能够在节点数组某个位置初始化节点成功
                 if (casTabAt(tab, i, null,
                              new Node<K,V>(hash, key, value, null)))
                     break;                   // no lock when adding to empty bin
@@ -1035,7 +1132,28 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                             binCount = 1;
                             for (Node<K,V> e = f;; ++binCount) {
                                 K ek;
-                                // 插入的(key, value), key内容和节点e维护的链表(或树节点)相同或地址相同
+                                /*
+                                 * 【判断条件详解】
+                                 *
+                                 * 这是一个典型的"键相等性判断"优化写法：
+                                 *
+                                 * 条件1: e.hash == hash
+                                 *   - 先比较哈希值（int比较，最快）
+                                 *   - 如果哈希值不同，肯定不是同一个键
+                                 *
+                                 * 条件2: (ek = e.key) == key
+                                 *   - 先将e.key赋值给局部变量ek（避免重复读取volatile字段）
+                                 *   - 然后比较引用是否相同（地址比较，O(1)）
+                                 *   - 如果是同一个对象，直接相等
+                                 *
+                                 * 条件3: ek != null && key.equals(ek)
+                                 *   - 如果引用不同，再比较内容（equals，O(n)）
+                                 *   - ek != null 是为了防止NPE
+                                 *   - equals是最终的相等性判断
+                                 *
+                                 * 【为什么这样设计？】
+                                 * 性能优化：先比较快的（哈希值、引用），再比较慢的（equals）
+                                 */
                                 if (e.hash == hash &&
                                     ((ek = e.key) == key ||
                                      (ek != null && key.equals(ek)))) {
@@ -1052,7 +1170,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                                 }
                             }
                         }
-                        else if (f instanceof TreeBin) {
+                        else if (f instanceof TreeBin) { // 检查是否树化
                             Node<K,V> p;
                             binCount = 2;
                             if ((p = ((TreeBin<K,V>)f).putTreeVal(hash, key,
