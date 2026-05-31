@@ -591,9 +591,14 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /*
      * Encodings for Node hash fields. See above for explanation.
      */
-    static final int MOVED     = -1; // hash for forwarding nodes
-    static final int TREEBIN   = -2; // hash for roots of trees
-    static final int RESERVED  = -3; // hash for transient reservations
+    // 标志哈希值，用于特殊节点类型的识别（都是负数，与正常哈希值区分）
+    static final int MOVED     = -1; // 转移节点：表示该桶正在扩容转移中（forwarding nodes）
+    static final int TREEBIN   = -2; // 树根节点：表示该桶已被树化（roots of trees）
+    static final int RESERVED  = -3; // 预留节点：用于临时预留位置（transient reservations）
+
+    // 有效哈希值的掩码，用于提取普通Node节点的实际哈希值
+    // 0x7fffffff = 0111_1111_1111_1111_1111_1111_1111_1111（31位1）
+    // 作用：去掉最高位符号位，保留下面31位有效哈希值位
     static final int HASH_BITS = 0x7fffffff; // usable bits of normal node hash
 
     /** Number of CPUS, to place bounds on some sizings */
@@ -1115,6 +1120,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 tab = initTable();
             // 节点数组对应的位置没有任何节点
             // (n - 1) & hash 计算出节点数组对应的位置, 位置保证在数组范围内
+            // 保证多个线程尝试放的时候, 仅有一个线程能够在节点数组某个位置初始化节点成功.
+            // 其他失败的线程会继续到下一次循环
             else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
                 // cas 保证多个线程尝试放的时候, 仅有一个线程能够在节点数组某个位置初始化节点成功
                 if (casTabAt(tab, i, null,
@@ -1127,9 +1134,12 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 V oldVal = null;
                 // 锁加在某个节点上, 在该节点维护的链表或树找到一个空位置插入新节点
                 synchronized (f) { // f: Node<K,V> 数组中的节点, i: 节点对应的下标
+                    // 二次判断防止：扩容、树化、并发删除和插入引起的变化
                     if (tabAt(tab, i) == f) {
                         if (fh >= 0) {
                             binCount = 1;
+                            // 遍历hash表某个桶节点维护的链表
+                            // - 直到找到一个空位置插入新节点, 或者找到一个key相同的节点更新value
                             for (Node<K,V> e = f;; ++binCount) {
                                 K ek;
                                 /*
@@ -1140,6 +1150,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                                  * 条件1: e.hash == hash
                                  *   - 先比较哈希值（int比较，最快）
                                  *   - 如果哈希值不同，肯定不是同一个键
+                                 * 注：hash相同不一定键相同，但哈希值不同一定键不同
                                  *
                                  * 条件2: (ek = e.key) == key
                                  *   - 先将e.key赋值给局部变量ek（避免重复读取volatile字段）
@@ -1764,6 +1775,13 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * @throws RuntimeException or Error if the mappingFunction does so,
      *         in which case the mapping is left unestablished
      */
+    /**
+     * 如果指定的 key 还未关联任何 value，则使用给定的 mappingFunction
+     * 计算其 value，并在结果非 null 时写入到此 map。
+     * 整个方法调用是原子执行的，因此对于同一个 key，映射函数最多只会被执行一次。
+     * 在计算进行期间，其他线程对该 map 的某些更新操作可能会被阻塞，
+     * 所以计算逻辑应当短小且简单，并且不能尝试更新该 map 的其他映射。
+     */
     public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
         if (key == null || mappingFunction == null)
             throw new NullPointerException();
@@ -1772,16 +1790,25 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         int binCount = 0;
         for (Node<K,V>[] tab = table;;) {
             Node<K,V> f; int n, i, fh;
+            // hash表没有初始化, 初始化hash表
             if (tab == null || (n = tab.length) == 0)
                 tab = initTable();
             else if ((f = tabAt(tab, i = (n - 1) & h)) == null) {
+                // 对应的hash表桶位置是null, 尝试cas插入一个占位节点ReservationNode
+                // ReservationNode：computeIfAbsent/compute 中使用的临时占位节点
+                // 作用：先占住桶位，避免并发线程重复计算 mappingFunction
+                // 其他线程看到该占位节点会被阻塞或重试，直到计算完成并替换为真实节点
                 Node<K,V> r = new ReservationNode<K,V>();
+                // synchronized 的目的：让占位节点在计算期间持锁，
+                // 1) 避免其他线程对该桶进行大量 CAS 自旋重试
+                // 2) 与同桶的 put/remove 等更新互斥，确保 mappingFunction 只执行一次
                 synchronized (r) {
                     if (casTabAt(tab, i, null, r)) {
                         binCount = 1;
                         Node<K,V> node = null;
                         try {
                             if ((val = mappingFunction.apply(key)) != null)
+                                // 替换掉原来的占位节点ReservationNode
                                 node = new Node<K,V>(h, key, val, null);
                         } finally {
                             setTabAt(tab, i, node);
@@ -1797,6 +1824,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 boolean added = false;
                 synchronized (f) {
                     if (tabAt(tab, i) == f) {
+                        // hash码是负数表示节点处于特殊状态（树化、迁移中等）
                         if (fh >= 0) {
                             binCount = 1;
                             for (Node<K,V> e = f;; ++binCount) {
