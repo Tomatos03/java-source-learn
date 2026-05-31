@@ -311,6 +311,9 @@ public interface Collector<T, A, R> {
      * Characteristics indicating properties of a {@code Collector}, which can
      * be used to optimize reduction implementations.
      */
+    /**
+     * Collector 的特性标记，用于描述收集器的行为语义，并帮助框架优化归约实现。
+     */
     enum Characteristics {
         /**
          * Indicates that this collector is <em>concurrent</em>, meaning that
@@ -322,6 +325,10 @@ public interface Collector<T, A, R> {
          * then it should only be evaluated concurrently if applied to an
          * unordered data source.
          */
+        /**
+         * 表示该收集器是“并发”的，同一个结果容器可被多个线程同时调用累加器。
+         * 若仅有 CONCURRENT 而没有 UNORDERED，则只应在无序数据源上并发执行。
+         */
         CONCURRENT,
 
         /**
@@ -329,12 +336,18 @@ public interface Collector<T, A, R> {
          * the encounter order of input elements.  (This might be true if the
          * result container has no intrinsic order, such as a {@link Set}.)
          */
+        /**
+         * 表示收集过程不保证保留输入元素的遇到顺序（如结果容器本身无序，Set 等）。
+         */
         UNORDERED,
 
         /**
          * Indicates that the finisher function is the identity function and
          * can be elided.  If set, it must be the case that an unchecked cast
          * from A to R will succeed.
+         */
+        /**
+         * 表示 finisher 是恒等函数，可被省略；此时 A 到 R 的强制转换必须安全。
          */
         IDENTITY_FINISH
     }
