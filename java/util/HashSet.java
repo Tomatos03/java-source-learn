@@ -95,6 +95,8 @@ public class HashSet<E>
     private transient HashMap<E,Object> map;
 
     // Dummy value to associate with an Object in the backing Map
+    // 虚拟值用于HashMap中与key关联占位, 整个hash表
+    // 共用一个PRESENT对象, 以节省空间
     private static final Object PRESENT = new Object();
 
     /**
@@ -215,6 +217,10 @@ public class HashSet<E>
      * @return <tt>true</tt> if this set did not already contain the specified
      * element
      */
+    // HashMap put()方法返回null的情况如下：
+    // - key 已经存在
+    // - key 已经存在但 value 是 null
+    // 由于HashSet中 value 永远是 PRESENT, 因此 put()方法返回 null 的情况只有 key 不存在的情况
     public boolean add(E e) {
         return map.put(e, PRESENT)==null;
     }
@@ -252,8 +258,8 @@ public class HashSet<E>
     @SuppressWarnings("unchecked")
     public Object clone() {
         try {
-            HashSet<E> newSet = (HashSet<E>) super.clone();
-            newSet.map = (HashMap<E, Object>) map.clone();
+            HashSet<E> newSet = (HashSet<E>) super.clone(); // 浅拷贝
+            newSet.map = (HashMap<E, Object>) map.clone(); // 替换掉原来的 map, 以实现深拷贝
             return newSet;
         } catch (CloneNotSupportedException e) {
             throw new InternalError(e);
