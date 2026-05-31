@@ -251,7 +251,7 @@ public class Object {
     // 常见子类实现：
     // @Override
     // protected Object clone() throws CloneNotSupportedException {
-    //     return super.clone();
+    //     return super.clone(); // 使用内置的浅拷贝实现
     // }
     // 克隆对象属性的数据类型是基本数据类型直接拷贝其值， 引用数据类型仅拷贝引用, 指向的对象仍然相同
     // 可变对象应该实现深拷贝, 不可变对象实现浅拷贝!!!
@@ -265,7 +265,7 @@ public class Object {
     //     @Override
     //     protected Person clone() throws CloneNotSupportedException {
     //         Person person = (Person) super.clone();
-    //         cloned.address = (Address) this.address.clone();
+    //         person.address = (Address) this.address.clone();
     //         return person;
     //     }
     // }
