@@ -101,20 +101,49 @@ import java.util.function.ToLongFunction;
  *
  * @since 1.8
  */
+/*
+ * Collectors 常用规约操作一览:
+ *
+ * | 操作/工厂方法 | 作用 | 典型结果 |
+ * | --- | --- | --- |
+ * | toList() | 收集为 List，保留遇到顺序 | List<T> |
+ * | toSet() | 收集为 Set，去重且无序 | Set<T> |
+ * | toCollection(Supplier) | 收集到指定集合类型 | Collection<T> |
+ * | toMap(key, val, merge?) | 收集为 Map，可指定冲突合并 | Map<K,V> |
+ * | toConcurrentMap(...) | 并发安全的 Map 收集 | ConcurrentMap<K,V> |
+ * | joining(delim?) | 拼接 CharSequence | String |
+ * | counting() | 计数 | Long |
+ * | summingInt/Long/Double | 求和 | Integer/Long/Double |
+ * | averagingInt/Long/Double | 平均值 | Double |
+ * | summarizingInt/Long/Double | 统计摘要（count/sum/min/max/avg） | SummaryStatistics |
+ * | reducing(...) | 自定义规约（归并） | Optional<T>/T |
+ * | groupingBy(classifier, downstream?) | 按键分组 | Map<K, List<T>/R> |
+ * | groupingByConcurrent(...) | 并发分组 | ConcurrentMap<K, R> |
+ * | partitioningBy(predicate, downstream?) | 按条件二分 | Map<Boolean, List<T>/R> |
+ * | mapping(mapper, downstream) | 映射后再下游收集 | R |
+ * | filtering(predicate, downstream) | 过滤后再下游收集 | R |
+ * | collectingAndThen(downstream, finisher) | 收集后再做一次转换 | R |
+ * | maxBy/minBy(comparator) | 取最大/最小元素 | Optional<T> |
+ */
 public final class Collectors {
 
+    // 并发 + 无序 + 直接返回累加器结果（无需finisher）的特性组合
     static final Set<Collector.Characteristics> CH_CONCURRENT_ID
             = Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.CONCURRENT,
                                                      Collector.Characteristics.UNORDERED,
                                                      Collector.Characteristics.IDENTITY_FINISH));
+    // 并发 + 无序，但需要finisher（非IDENTITY_FINISH）的特性组合
     static final Set<Collector.Characteristics> CH_CONCURRENT_NOID
             = Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.CONCURRENT,
                                                      Collector.Characteristics.UNORDERED));
+    // 仅具备IDENTITY_FINISH（累加器结果即最终结果）的特性组合
     static final Set<Collector.Characteristics> CH_ID
             = Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.IDENTITY_FINISH));
+    // 无序 + IDENTITY_FINISH 的特性组合
     static final Set<Collector.Characteristics> CH_UNORDERED_ID
             = Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.UNORDERED,
                                                      Collector.Characteristics.IDENTITY_FINISH));
+    // 不具备任何特性（空特性集合）
     static final Set<Collector.Characteristics> CH_NOID = Collections.emptySet();
 
     private Collectors() { }
@@ -144,7 +173,32 @@ public final class Collectors {
      * @param <T> the type of elements to be collected
      * @param <R> the type of the result
      */
-    static class CollectorImpl<T, A, R> implements Collector<T, A, R> {
+    /*
+     * 字段含义：
+     * - supplier：创建可变结果容器 A
+     * - accumulator：将元素 T 累加到容器 A
+     * - combiner：并行时合并两个容器 A
+     * - finisher：将容器 A 转换为最终结果 R
+     * - characteristics：收集器特性（并发/无序/是否需要 finisher）
+     *
+     * 示例1：收集为 List（IDENTITY_FINISH）
+     * CollectorImpl<String, List<String>, List<String>> c =
+     *     new CollectorImpl<>(
+     *         ArrayList::new,
+     *         (list, e) -> list.add(e),
+     *         (l1, l2) -> { l1.addAll(l2); return l1; },
+     *         CH_ID);
+     *
+     * 示例2：收集为 Set（UNORDERED + IDENTITY_FINISH）
+     * CollectorImpl<String, Set<String>, Set<String>> c =
+     *     new CollectorImpl<>(
+     *         HashSet::new,
+     *         (set, e) -> set.add(e),
+     *         (s1, s2) -> { s1.addAll(s2); return s1; },
+     *         CH_UNORDERED_ID);
+     */
+     //泛型参数含义T -> 输入元素类型，A -> 累加容器类型（例如Set、List、Map），R -> 最终结果类型
+     static class CollectorImpl<T, A, R> implements Collector<T, A, R> {
         private final Supplier<A> supplier;
         private final BiConsumer<A, T> accumulator;
         private final BinaryOperator<A> combiner;
