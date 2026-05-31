@@ -1993,6 +1993,41 @@ public class File
      *
      * @since 1.2
      */
+    /*
+     * 在指定目录中创建一个新的空文件，文件名由 prefix 和 suffix 组合生成。
+     * 若方法成功返回，则保证：
+     * 1) 返回的抽象路径在调用前不存在；
+     * 2) 在当前 JVM 运行期间，本方法及其变体不会再次返回相同路径。(JVM运行期间保证多次调用这个方法及其变体不会创建重复的文件)
+     *
+     * 这个方法仅仅负责"创建临时文件",并不会自动清理。
+     * 如需 JVM 退出时自动删除，使用 deleteOnExit。
+     *
+     * prefix 至少 3 个字符，建议简短有意义；suffix 可为 null，此时默认 ".tmp"。
+     *
+     * 为适配底层平台限制，prefix/suffix 可能被截断：
+     * - prefix 太长则截断，但保留前 3 个字符；
+     * - suffix 太长则截断；若以 '.' 开头，则保留 '.' 及其后 3 个字符。
+     * 调整完成后，最终文件名 = prefix + 内部生成字符(>=5) + suffix。
+     *
+     * directory 为 null 时使用系统默认临时目录（java.io.tmpdir）。
+     * 不同操作系统默认值不同，且运行时修改该属性不保证生效。
+     * 常见默认路径示例：
+     * - Linux/Unix：/tmp 或 /var/tmp
+     * - macOS：/var/folders/...（系统生成的临时目录）
+     * - Windows：C:\\Windows\\Temp 或 C:\\Users\\<用户>\\AppData\\Local\\Temp
+     *
+     * 参数：
+     * - prefix：文件名前缀，至少 3 个字符
+     * - suffix：文件名后缀，可为 null
+     * - directory：目标目录，null 表示默认临时目录
+     *
+     * 返回：新建空文件的路径
+     *
+     * 异常：
+     * - IllegalArgumentException：prefix 少于 3 个字符
+     * - IOException：创建失败
+     * - SecurityException：安全管理器不允许创建文件
+     */
     public static File createTempFile(String prefix, String suffix,
                                       File directory)
         throws IOException
