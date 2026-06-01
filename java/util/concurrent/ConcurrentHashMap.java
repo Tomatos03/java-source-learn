@@ -1799,9 +1799,36 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 // 作用：先占住桶位，避免并发线程重复计算 mappingFunction
                 // 其他线程看到该占位节点会被阻塞或重试，直到计算完成并替换为真实节点
                 Node<K,V> r = new ReservationNode<K,V>();
-                // synchronized 的目的：让占位节点在计算期间持锁，
-                // 1) 避免其他线程对该桶进行大量 CAS 自旋重试
-                // 2) 与同桶的 put/remove 等更新互斥，确保 mappingFunction 只执行一次
+                /*
+                 * synchronized(r) 的目的：不是为了互斥而是为了让占位节点r在被CAS放入table后，其他线程能通过 synchronized(f) 等待。
+                 * 设计意图： mappingFunction执行时间是不确定的，如果利用cas实现自旋锁保证一线程去初始化
+                 * 桶节点，会让大量的线程处于自旋状态消耗cpu
+                 *
+                 *
+                 * 注意：这里的互斥完全靠CAS保证，synchronized(r)本身不提供互斥。
+                 *
+                 * 【并发场景详解】两个线程同时对同一个空桶操作：
+                 *
+                 * 线程A                           线程B
+                 * ──────────────────────────────────────────────
+                 * rA = new ReservationNode()
+                 * synchronized(rA) {
+                 *                                 rB = new ReservationNode()
+                 *                                 synchronized(rB) {
+                 *   casTabAt(null → rA) 成功
+                 *                                   casTabAt(null → rB) 失败（已是rA）
+                 *   mappingFunction执行中...
+                 *                                   casTabAt返回false，if不进入
+                 *                                 }
+                 *                                 回到for循环，再次判断...
+                 *                                 此时table[i] = rA（不是null，也不是MOVED）
+                 *                                 进入 else 分支（第1823行）
+                 *                                 synchronized(rA) { ← 等待线程A释放rA的锁
+                 *   mappingFunction完成
+                 *   setTabAt(tab, i, node)
+                 *   synchronized(rA) 释放锁
+                 *                                 } ← 拿到锁，继续执行
+                 */
                 synchronized (r) {
                     if (casTabAt(tab, i, null, r)) {
                         binCount = 1;
