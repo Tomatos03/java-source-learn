@@ -374,6 +374,8 @@ public class Collections {
     public static void reverse(List<?> list) {
         int size = list.size();
         if (size < REVERSE_THRESHOLD || list instanceof RandomAccess) {
+            // 支持随机访问或小于反转阈值
+            // 左右交换顺序遍历
             for (int i=0, mid=size>>1, j=size-1; i<mid; i++, j--)
                 swap(list, i, j);
         } else {
@@ -382,6 +384,7 @@ public class Collections {
             // private method
             ListIterator fwd = list.listIterator();
             ListIterator rev = list.listIterator(size);
+            // 左右迭代器交换遍历
             for (int i=0, mid=list.size()>>1; i<mid; i++) {
                 Object tmp = fwd.next();
                 fwd.set(rev.previous());
@@ -451,6 +454,7 @@ public class Collections {
      *         list-iterator does not support the <tt>set</tt> operation.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
+    // 随机打乱当前列表
     public static void shuffle(List<?> list, Random rnd) {
         int size = list.size();
         if (size < SHUFFLE_THRESHOLD || list instanceof RandomAccess) {
@@ -489,17 +493,20 @@ public class Collections {
      * @since 1.4
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
+    // 交换列表中两个位置的元素
     public static void swap(List<?> list, int i, int j) {
         // instead of using a raw type here, it's possible to capture
         // the wildcard but it will require a call to a supplementary
         // private method
         final List l = list;
+        // List中的set方法会返回之前位置的元素
         l.set(i, l.set(j, l.get(i)));
     }
 
     /**
      * Swaps the two specified elements in the specified array.
      */
+    // 为数组类型提供支持
     private static void swap(Object[] arr, int i, int j) {
         Object tmp = arr[i];
         arr[i] = arr[j];
@@ -522,6 +529,7 @@ public class Collections {
         int size = list.size();
 
         if (size < FILL_THRESHOLD || list instanceof RandomAccess) {
+            // 支持随机访问或小于填充阈值
             for (int i=0; i<size; i++)
                 list.set(i, obj);
         } else {
@@ -554,6 +562,7 @@ public class Collections {
         int srcSize = src.size();
         if (srcSize > dest.size())
             throw new IndexOutOfBoundsException("Source does not fit in dest");
+        // dest.size() >= src.size()
 
         if (srcSize < COPY_THRESHOLD ||
             (src instanceof RandomAccess && dest instanceof RandomAccess)) {
@@ -591,6 +600,7 @@ public class Collections {
      * @throws NoSuchElementException if the collection is empty.
      * @see Comparable
      */
+    // 通过迭代器遍历的方式来寻找集合中的最小元素
     public static <T extends Object & Comparable<? super T>> T min(Collection<? extends T> coll) {
         Iterator<? extends T> i = coll.iterator();
         T candidate = i.next();
@@ -626,7 +636,8 @@ public class Collections {
      * @throws NoSuchElementException if the collection is empty.
      * @see Comparable
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+     // 通过迭代器遍历的方式来寻找集合中的最小元素，使用指定的比较器来比较元素
+     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <T> T min(Collection<? extends T> coll, Comparator<? super T> comp) {
         if (comp==null)
             return (T)min((Collection) coll);
@@ -834,7 +845,9 @@ public class Collections {
      *         its list-iterator does not support the <tt>set</tt> operation.
      * @since  1.4
      */
-    public static <T> boolean replaceAll(List<T> list, T oldVal, T newVal) {
+     // 有值被替换时返回空，否则返回false
+     // 利用对象的equals方法比较元素是否相等
+     public static <T> boolean replaceAll(List<T> list, T oldVal, T newVal) {
         boolean result = false;
         int size = list.size();
         if (size < REPLACEALL_THRESHOLD || list instanceof RandomAccess) {
