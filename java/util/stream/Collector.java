@@ -200,6 +200,9 @@ public interface Collector<T, A, R> {
      *
      * @return a function which returns a new, mutable result container
      */
+    // 数据源供应函数
+    // 常见示例实现：
+    // () -> new HashSet<Integer>()
     Supplier<A> supplier();
 
     /**
@@ -207,6 +210,9 @@ public interface Collector<T, A, R> {
      *
      * @return a function which folds a value into a mutable result container
      */
+    // 数据源消费新数据函数
+    // 常见示例实现：
+    // (Set<Integer> r, Integer t) -> r.add(t)
     BiConsumer<A, T> accumulator();
 
     /**
@@ -217,6 +223,8 @@ public interface Collector<T, A, R> {
      * @return a function which combines two partial results into a combined
      * result
      */
+    // 数据源合并函数， 合并多个数据源为两个数据源，常见示例实现：
+    // (Set<Integer> r1, Set<Integer> r2) -> { r1.addAll(r2); return r1; }
     BinaryOperator<A> combiner();
 
     /**
@@ -230,6 +238,8 @@ public interface Collector<T, A, R> {
      * @return a function which transforms the intermediate result to the final
      * result
      */
+    // 数据源转换函数， 对记结果数据源进行转换，常见示例实现：
+    // (Set<Integer> r) -> Collections.unmodifiableSet(r)
     Function<A, R> finisher();
 
     /**
@@ -347,7 +357,7 @@ public interface Collector<T, A, R> {
          * from A to R will succeed.
          */
         /**
-         * 表示 finisher 是恒等函数，可被省略；此时 A 到 R 的强制转换必须安全。
+         * 表示 finisher 是恒等函数，finisher函数可以直接省略；此时 A 到 R 的强制转换必须安全。
          */
         IDENTITY_FINISH
     }
