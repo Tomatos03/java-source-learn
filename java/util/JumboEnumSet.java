@@ -26,6 +26,24 @@
 package java.util;
 
 /**
+ * EnumSet的"超大"实现，适用于枚举常量数 > 64 的枚举类型。
+ *
+ * 核心思想：用 long[] 数组作为位向量，每个 long 管理 64 个枚举值。
+ * 数组第 j 个元素的第 i 位表示 universe[64*j + i] 是否在集合中。
+ *
+ * 与 RegularEnumSet 的区别：
+ * - RegularEnumSet 用单个 long，size() 实时计算（Long.bitCount）
+ * - JumboEnumSet 用 long[] 数组，额外维护 size 字段避免频繁 bitCount
+ * - 批量操作需要遍历数组，性能略逊于 RegularEnumSet
+ *
+ * 数组长度计算：(universe.length + 63) >>> 6
+ *   例如 128 个枚举值 → (128+63)/64 = 3 个 long
+ *
+ * 选择策略：由 EnumSet.allOf() 根据 universe.length 决定：
+ *   universe.length <= 64 → RegularEnumSet
+ *   universe.length >  64 → JumboEnumSet
+ */
+/**
  * Private implementation class for EnumSet, for "jumbo" enum types
  * (i.e., those with more than 64 elements).
  *
@@ -37,12 +55,17 @@ class JumboEnumSet<E extends Enum<E>> extends EnumSet<E> {
     private static final long serialVersionUID = 334349849919042784L;
 
     /**
+     * 位向量数组。elements[j] 的第 i 位为 1 表示 universe[64*j + i] 在集合中。
+     * 例如 elements[0] 覆盖 universe[0..63]，elements[1] 覆盖 universe[64..127]。
+     */
+    /**
      * Bit vector representation of this set.  The ith bit of the jth
      * element of this array represents the  presence of universe[64*j +i]
      * in this set.
      */
     private long elements[];
 
+    // 额外维护的 size 字段，避免每次调用 size() 时遍历数组做 bitCount
     // Redundant - maintained for performance
     private int size = 0;
 

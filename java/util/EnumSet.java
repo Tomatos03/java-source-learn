@@ -77,6 +77,29 @@ import sun.misc.SharedSecrets;
  * @see EnumMap
  * @serial exclude
  */
+/*
+ * 枚举集合（EnumSet）是专门为枚举类型设计的 Set 实现。集合中的所有元素必须来自
+ * 同一个枚举类型，该类型在创建集合时显式或隐式指定。EnumSet 在内部以位向量（bit vector）
+ * 的形式表示，这种表示方式极其紧凑且高效。该类的空间和时间性能足以使其成为传统基于
+ * int 的"位标志"的高质量、类型安全的替代方案。即使批量操作（如 containsAll
+ * 和 retainAll）在参数也是枚举集合时也能非常快速地执行。
+ *
+ * iterator 方法返回的迭代器按照自然顺序（即枚举常量的声明顺序）遍历
+ * 元素。返回的迭代器是弱一致性的：它永远不会抛出 ConcurrentModificationException，
+ * 并且可能显示也可能不显示在迭代进行期间对集合所做的任何修改的效果。
+ *
+ * 不允许 null 元素。尝试插入 null 元素将抛出 NullPointerException。
+ * 但是，尝试检测 null 元素是否存在或移除 null 元素则可以正常执行。
+ *
+ * 与大多数集合实现一样，EnumSet 不是同步的。如果多个线程并发访问枚举集合，
+ * 并且至少有一个线程修改了该集合，则必须在外部对其进行同步。这通常通过在自然封装枚举
+ * 集合的某个对象上进行同步来实现。如果不存在这样的对象，则应使用
+ * Collections.synchronizedSet 方法"包装"该集合。最好在创建时完成此操作，
+ * 以防止意外的非同步访问。
+ *
+ * 实现说明：所有基本操作都在常数时间内执行。它们很可能（但不能保证）比对应的
+ * HashSet 操作快得多。即使批量操作在参数也是枚举集合时也在常数时间内执行。
+ */
 public abstract class EnumSet<E extends Enum<E>> extends AbstractSet<E>
     implements Cloneable, java.io.Serializable
 {

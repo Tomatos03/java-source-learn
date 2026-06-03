@@ -26,6 +26,22 @@
 package java.util;
 
 /**
+ * EnumSet的"常规"实现，适用于枚举常量数 ≤ 64 的枚举类型。
+ *
+ * 核心思想：用单个 long（64位）作为位向量（bit vector），
+ * 其中第 2^k 位表示 universe[k] 是否在集合中。
+ * 由于一个 long 恰好 64 位，可以覆盖最多 64 个枚举值。
+ *
+ * 优势：
+ * - 所有操作（add/remove/contains）都是单条位运算指令，O(1) 级别
+ * - 批量操作（addAll/retainAll/removeAll）也只需一次位运算
+ * - size() 使用 Long.bitCount() 实时计算，无需额外维护字段
+ *
+ * 选择策略：由 EnumSet.allOf() 根据 universe.length 决定：
+ *   universe.length <= 64 → RegularEnumSet
+ *   universe.length >  64 → JumboEnumSet
+ */
+/**
  * Private implementation class for EnumSet, for "regular sized" enum types
  * (i.e., those with 64 or fewer enum constants).
  *
@@ -35,6 +51,10 @@ package java.util;
  */
 class RegularEnumSet<E extends Enum<E>> extends EnumSet<E> {
     private static final long serialVersionUID = 3411599620347842686L;
+    /**
+     * 位向量表示。第 2^k 位为 1 表示 universe[k] 在集合中。
+     * 例如 universe = {A, B, C} 时，elements = 0b101 表示 {A, C}。
+     */
     /**
      * Bit vector representation of this set.  The 2^k bit indicates the
      * presence of universe[k] in this set.
