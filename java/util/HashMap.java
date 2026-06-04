@@ -921,6 +921,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
                         break;
+                    // key对应的value是可以为null的
+                    // 同时key可以是null，但有且仅有一个key=null的位置
+                    // 空值null被Node包装
                     p = e;
                 }
             }
