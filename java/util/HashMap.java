@@ -1394,6 +1394,22 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         return null;
     }
 
+    /**
+     * 使用场景参考:
+     * Map<Integer, List<String>> map = new HashMap<>();
+     * String[] words = {"hi", "hello", "hey", "world", "ok", "java"};
+     *
+     * for (String word : words) {
+     *     map.computeIfAbsent(word.length(), k -> new ArrayList<>())
+     *        .add(word);
+     * }
+     *
+     * computeIfAbsent 的行为：
+     * - key 存在且 value 非 null → 直接返回已有 value，不做任何操作
+     * - key 不存在或 value 为 null → 调用 mappingFunction(key) 计算新值
+     *   - 新值非 null → 插入该 k-v
+     *   - 新值为 null → 不插入，返回 null
+     */
     @Override
     public V computeIfAbsent(K key,
                              Function<? super K, ? extends V> mappingFunction) {
@@ -1448,6 +1464,28 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         return v;
     }
 
+    /**
+     * 应用场景示例：维护用户积分排行榜，分数归零时自动移除该用户
+     *
+     * Map<String, Integer> scores = new HashMap<>();
+     * scores.put("Alice", 100);
+     * scores.put("Bob", 50);
+     *
+     * // Alice 扣分后还有分 → 更新
+     * scores.computeIfPresent("Alice", (k, v) -> v - 30);   // Alice → 70
+     *
+     * // Alice 再扣分归零 → 自动移除
+     * scores.computeIfPresent("Alice", (k, v) -> v - 70);   // Alice 被移除
+     *
+     * // Charlie 不存在 → 不做任何操作，返回 null
+     * scores.computeIfPresent("Charlie", (k, v) -> v + 10); // scores 不变
+     *
+     * computeIfPresent 的行为：
+     * - key 不存在或 value 为 null → 不执行函数，直接返回 null
+     * - key 存在且 value 非 null → 调用 remappingFunction(key, oldValue)
+     *   - 新值非 null → 替换 oldValue
+     *   - 新值为 null → 删除该 k-v
+     */
     public V computeIfPresent(K key,
                               BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         if (remappingFunction == null)
@@ -1521,6 +1559,23 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         return v;
     }
 
+    /**
+     * 应用场景示例：统计单词出现次数
+     *
+     * Map<String, Integer> wordCount = new HashMap<>();
+     * String[] words = {"apple", "banana", "apple", "cherry", "banana", "apple"};
+     *
+     * for (String word : words) {
+     *     wordCount.merge(word, 1, Integer::sum);
+     * }
+     * // 结果: {apple=3, banana=2, cherry=1}
+     *
+     * merge 的行为：
+     * - key 不存在时，直接插入 key-value
+     * - key 存在时，调用 remappingFunction(oldValue, value) 计算新值
+     *   - 新值为 null → 删除该 k-v
+     *   - 新值非 null → 替换 oldValue
+     */
     @Override
     public V merge(K key, V value,
                    BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
