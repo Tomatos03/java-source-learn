@@ -46,6 +46,17 @@ public final class ByteOrder {
      * Constant denoting big-endian byte order.  In this order, the bytes of a
      * multibyte value are ordered from most significant to least significant.
      */
+    /*
+     * 大端字节顺序（Big-Endian）：高位字节存储在低地址
+     *
+     * 例如数字 0x12345678 在内存中的存储：
+     *   地址:  0    1    2    3
+     *         [12][34][56][78]
+     *         ↑
+     *       高位字节（最高有效字节）
+     *
+     * 常见用途：网络传输（网络字节序）、Java 内部表示
+     */
     public static final ByteOrder BIG_ENDIAN
         = new ByteOrder("BIG_ENDIAN");
 
@@ -53,6 +64,17 @@ public final class ByteOrder {
      * Constant denoting little-endian byte order.  In this order, the bytes of
      * a multibyte value are ordered from least significant to most
      * significant.
+     */
+    /*
+     * 小端字节顺序（Little-Endian）：低位字节存储在低地址
+     *
+     * 例如数字 0x12345678 在内存中的存储：
+     *   地址:  0    1    2    3
+     *         [78][56][34][12]
+     *         ↑
+     *       低位字节（最低有效字节）
+     *
+     * 常见用途：x86/x64 架构、ARM 架构（默认）
      */
     public static final ByteOrder LITTLE_ENDIAN
         = new ByteOrder("LITTLE_ENDIAN");
