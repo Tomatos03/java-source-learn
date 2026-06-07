@@ -171,7 +171,7 @@ import java.util.Spliterator;
  * @author JSR-51 Expert Group
  * @since 1.4
  */
-
+// Buffer的所有子类除了接口中声明的方法外还必须包含get()和put()方法，这些方法的实现细节由各个子类来完成
 public abstract class Buffer {
 
     /**
@@ -183,8 +183,11 @@ public abstract class Buffer {
 
     // Invariants: mark <= position <= limit <= capacity
     private int mark = -1;
+    // 下一个要被读或写的元素的索引位置
     private int position = 0;
+    // 当前维护的缓存区数组的界限，不能读写超过这个界限的数据
     private int limit;
+    // 当前维护的缓存区数组的容积
     private int capacity;
 
     // Used only by direct buffers
@@ -300,6 +303,8 @@ public abstract class Buffer {
      * @throws  InvalidMarkException
      *          If the mark has not been set
      */
+    // 将position重置为mark的位置，如果mark没有被设置，则抛出InvalidMarkException异常
+    // mark如果没有被设置，则mark的值为-1，所以当mark<0时，说明mark没有被设置
     public final Buffer reset() {
         int m = mark;
         if (m < 0)
@@ -325,6 +330,7 @@ public abstract class Buffer {
      *
      * @return  This buffer
      */
+    // 重置四个属性为初始状态，position=0，limit=capacity，mark=-1
     public final Buffer clear() {
         position = 0;
         limit = capacity;
@@ -353,6 +359,59 @@ public abstract class Buffer {
      *
      * @return  This buffer
      */
+     /*
+      *
+      * ==================== flip 前（写模式） ====================
+      *
+      *   capacity = 10
+      *   position = 5  (下一个可写位置)
+      *   limit    = 10 (可写上限)
+      *
+      *   索引:    0    1    2    3    4    5    6    7    8    9
+      *         +----+----+----+----+----+----+----+----+----+----+
+      *         | H  | e  | l  | l  | o  |    |    |    |    |    |
+      *         +----+----+----+----+----+----+----+----+----+----+
+      *                                    |                         |
+      *                                    v                         v
+      *                                position                    limit
+      *                                 (可写)                     (不可写)
+      *
+      * ==================== flip 后（读模式） ====================
+      *
+      *   capacity = 10
+      *   position = 0  (下一个可读位置)
+      *   limit    = 5  (可读上限，即之前写入的数据量)
+      *
+      *   索引:    0    1    2    3    4    5    6    7    8    9
+      *         +----+----+----+----+----+----+----+----+----+----+
+      *         | H  | e  | l  | l  | o  |    |    |    |    |    |
+      *         +----+----+----+----+----+----+----+----+----+----+
+      *            ^                       ^
+      *         position                limit
+      *      (可读)               (不可读)
+      *
+      * ============================================================
+      *
+      * 一个应用场景：
+      *
+      * CharBuffer append = CharBuffer
+      *         .allocate(10)
+      *         .append('H')
+      *         .append('l')
+      *         .append('l')
+      *         .append('o');
+      *
+      * StringBuilder stringBuilder = new StringBuilder();
+      *
+      * append.flip();  // 从写模式切换到读模式
+      *
+      * while (append.hasRemaining()) {
+      *     stringBuilder.append(append.get());
+      * }
+      *
+      * // stringBuilder.toString() = "Hllo"
+      *
+      */
     public final Buffer flip() {
         limit = position;
         position = 0;
@@ -407,6 +466,7 @@ public abstract class Buffer {
      *
      * @return  <tt>true</tt> if, and only if, this buffer is read-only
      */
+    // 所有的Buffer缓冲区都是可读的，但是不一定是可写的，通过当前方法判断是否缓冲区是否可写
     public abstract boolean isReadOnly();
 
     /**
