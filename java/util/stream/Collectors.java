@@ -158,6 +158,9 @@ public final class Collectors {
      * @param <T> the type of input arguments to the merge function
      * @return a merge function which always throw {@code IllegalStateException}
      */
+    /**
+     * 合并两个元素时抛出异常，如果元素相同抛出异常
+     */
     private static <T> BinaryOperator<T> throwingMerger() {
         return (u,v) -> { throw new IllegalStateException(String.format("Duplicate key %s", u)); };
     }
@@ -366,6 +369,9 @@ public final class Collectors {
      * @param mergeFunction A merge function suitable for
      * {@link Map#merge(Object, Object, BiFunction) Map.merge()}
      * @return a merge function for two maps
+     */
+    /**
+     * 合并两个map集合，如果key有冲突调用mergeFunction函数解决冲突
      */
     private static <K, V, M extends Map<K,V>>
     BinaryOperator<M> mapMerger(BinaryOperator<V> mergeFunction) {
@@ -1259,6 +1265,9 @@ public final class Collectors {
      * @see #toMap(Function, Function, BinaryOperator)
      * @see #toMap(Function, Function, BinaryOperator, Supplier)
      * @see #toConcurrentMap(Function, Function)
+     */
+    /**
+     * 注意：构建Map时，如果存在相同的key则抛出异常
      */
     public static <T, K, U>
     Collector<T, ?, Map<K,U>> toMap(Function<? super T, ? extends K> keyMapper,
