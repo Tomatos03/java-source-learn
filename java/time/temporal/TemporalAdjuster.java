@@ -102,6 +102,49 @@ import java.time.DateTimeException;
  * @see TemporalAdjusters
  * @since 1.8
  */
+/**
+ * 中文说明
+ * <p>
+ * TemporalAdjuster 是一个函数式接口(策略模式), 用于对时间对象进行调整.
+ * 核心思想: 将"如何调整时间"的逻辑从时间对象本身抽离出来, 允许灵活组合不同的调整策略.
+ * <p>
+ * 典型使用场景:
+ * <ul>
+ *   <li>将日期调整到本月最后一天</li>
+ *   <li>跳过周末, 找到下一个工作日</li>
+ *   <li>找到本月第一个周一</li>
+ *   <li>找到下一个周五</li>
+ * </ul>
+ * <p>
+ * 使用方式(推荐第二种, 可读性更好):
+ * <pre>
+ *   temporal = adjuster.adjustInto(temporal);   // 直接调用接口方法
+ *   temporal = temporal.with(adjuster);          // 推荐: 通过 Temporal.with() 调用
+ * </pre>
+ * <p>
+ * JDK 在 {@link TemporalAdjusters} 工具类中提供了大量预定义实现:
+ * <ul>
+ *   <li>firstDayOfMonth() / lastDayOfMonth()     - 本月第一天 / 最后一天</li>
+ *   <li>firstDayOfNextMonth() / firstDayOfNextYear() - 下月第一天 / 明年第一天</li>
+ *   <li>firstDayOfYear() / lastDayOfYear()       - 本年第一天 / 最后一天</li>
+ *   <li>next(DayOfWeek) / previous(DayOfWeek)    - 下一个 / 上一个星期几</li>
+ *   <li>nextOrSame() / previousOrSame()          - 同上, 但如果当天就是目标则返回自身</li>
+ *   <li>firstInMonth(DayOfWeek) / lastInMonth()  - 本月第一个/最后一个指定星期几</li>
+ *   <li>dayOfWeekInMonth(ordinal, DayOfWeek)     - 本月第 N 个指定星期几</li>
+ * </ul>
+ * <p>
+ * 也可以用 Lambda 自定义:
+ * <pre>
+ *   TemporalAdjuster nextWorkday = temporal -&gt; {
+ *       LocalDate date = LocalDate.from(temporal);
+ *       DayOfWeek dow = date.getDayOfWeek();
+ *       int daysToAdd = (dow == DayOfWeek.FRIDAY) ? 3
+ *                      : (dow == DayOfWeek.SATURDAY) ? 2 : 1;
+ *       return date.plusDays(daysToAdd);
+ *   };
+ *   LocalDate result = LocalDate.now().with(nextWorkday);
+ * </pre>
+ */
 @FunctionalInterface
 public interface TemporalAdjuster {
 
@@ -146,6 +189,23 @@ public interface TemporalAdjuster {
      * @return an object of the same observable type with the adjustment made, not null
      * @throws DateTimeException if unable to make the adjustment
      * @throws ArithmeticException if numeric overflow occurs
+     */
+    /**
+     * 对传入的时间对象进行调整, 返回调整后的新对象.
+     *
+     * 实现要求:
+     * <ul>
+     *   <li>不能修改传入的对象(不可变语义), 必须返回新对象</li>
+     *   <li>返回的对象类型必须与输入一致(如输入 LocalDate, 返回也必须是 LocalDate)</li>
+     *   <li>必须线程安全, 允许多线程并发调用</li>
+     * </ul>
+     * <p>
+     * 推荐使用 {@code temporal.with(adjuster)} 而非直接调用本方法, 可读性更好.
+     *
+     * @param temporal 要调整的时间对象, 不能为 null
+     * @return 调整后的新对象, 类型与输入一致, 不为 null
+     * @throws DateTimeException 如果无法进行调整
+     * @throws ArithmeticException 如果数值溢出
      */
     Temporal adjustInto(Temporal temporal);
 
