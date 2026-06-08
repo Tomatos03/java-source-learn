@@ -161,6 +161,7 @@ public class Date
      *
      * @see     java.lang.System#currentTimeMillis()
      */
+    // 默认构造函数，创建一个表示当前时间的 Date 对象
     public Date() {
         this(System.currentTimeMillis());
     }
@@ -174,6 +175,8 @@ public class Date
      * @param   date   the milliseconds since January 1, 1970, 00:00:00 GMT.
      * @see     java.lang.System#currentTimeMillis()
      */
+    // 传入的时间date, 初始化Date对象.
+    // date参数表示自1970年1月1日00:00:00 GMT以来的毫秒数，Date对象将表示这个时间点。
     public Date(long date) {
         fastTime = date;
     }
