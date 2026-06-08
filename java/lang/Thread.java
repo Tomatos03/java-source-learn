@@ -1736,17 +1736,29 @@ class Thread implements Runnable {
      * @since   1.5
      * @see #getState
      */
+    // Java 种的线程模型使用的状态
     public enum State {
         /**
          * Thread state for a thread which has not yet started.
          */
-        NEW,
+        /**
+         * 线程尚未启动的状态。
+         * 当线程对象被创建（new Thread()），但还未调用 start() 方法时，
+         * 线程就处于 NEW 状态。此时操作系统尚未为其分配资源。
+         */
+         NEW,
 
         /**
          * Thread state for a runnable thread.  A thread in the runnable
          * state is executing in the Java virtual machine but it may
          * be waiting for other resources from the operating system
          * such as processor.
+         */
+        /**
+         * 可运行线程的状态。
+         * 线程已经调用了 start() 方法，正在 JVM 中运行或等待操作系统分配 CPU 时间片。
+         * 处于此状态的线程可能正在执行，也可能正在就绪队列中等待 CPU 调度。
+         * 在 Java 层面，RUNNABLE 状态涵盖了传统意义上的"就绪"和"运行"两种状态。
          */
         RUNNABLE,
 
@@ -1756,6 +1768,12 @@ class Thread implements Runnable {
          * to enter a synchronized block/method or
          * reenter a synchronized block/method after calling
          * {@link Object#wait() Object.wait}.
+         */
+        /**
+         * 等待监视器锁而被阻塞的状态。
+         * 线程试图进入一个 synchronized 同步块或同步方法，但该锁被其他线程持有时进入此状态。
+         * 或者线程在调用 Object.wait() 后，试图重新获取锁以回到同步块时也会处于此状态。
+         * 通常发生在多线程竞争同一把锁的场景。
          */
         BLOCKED,
 
@@ -1778,6 +1796,17 @@ class Thread implements Runnable {
          * that object. A thread that has called <tt>Thread.join()</tt>
          * is waiting for a specified thread to terminate.
          */
+        /**
+         * 等待状态。
+         * 线程正在等待另一个线程执行特定操作时处于此状态，触发方式包括：
+         * - 调用 Object.wait()（无超时时间）
+         * - 调用 Thread.join()（无超时时间）
+         * - 调用 LockSupport.park()
+         *
+         * 例如：调用 Object.wait() 的线程等待其他线程调用 notify()/notifyAll()；
+         * 调用 Thread.join() 的线程等待指定线程执行结束。
+         * 与 TIMED_WAITING 的区别是，WAITING 会无限期等待，直到被显式唤醒。
+         */
         WAITING,
 
         /**
@@ -1792,11 +1821,33 @@ class Thread implements Runnable {
          *   <li>{@link LockSupport#parkUntil LockSupport.parkUntil}</li>
          * </ul>
          */
+        /**
+         * 超时等待状态。
+         * 线程在指定的等待时间内处于此状态，超时后会自动返回，触发方式包括：
+         * - 调用 Thread.sleep(long millis)
+         * - 调用 Object.wait(long timeout)（带超时时间）
+         * - 调用 Thread.join(long millis)（带超时时间）
+         * - 调用 LockSupport.parkNanos()
+         * - 调用 LockSupport.parkUntil()
+         *
+         * 与 WAITING 状态的区别是，TIMED_WAITING 会在指定时间后自动唤醒，
+         * 不需要其他线程显式地调用 notify()/notifyAll()。
+         */
         TIMED_WAITING,
 
         /**
          * Thread state for a terminated thread.
          * The thread has completed execution.
+         */
+        /**
+         * 终止状态。
+         * 线程已经执行完成，可能的原因包括：
+         * - run() 方法正常执行结束
+         * - 线程执行过程中抛出未捕获的异常
+         * - 调用了已废弃的 stop() 方法（不推荐使用）
+         *
+         * 处于此状态的线程不会再被调度执行，且不可再次调用 start() 方法重启，
+         * 否则会抛出 IllegalThreadStateException。
          */
         TERMINATED;
     }
