@@ -114,6 +114,8 @@ public abstract class Enum<E extends Enum<E>>
      *         in the enum declaration, where the initial constant is assigned
      *         an ordinal of zero).
      */
+    // 一个枚举类必然有name和ordinal两个字段，分别表示枚举常量的名称和在枚举声明中的位置（从0开始）。
+    // 这个构造函数由编译器在编译枚举类型时自动生成，并且不能被程序员直接调用。
     protected Enum(String name, int ordinal) {
         this.name = name;
         this.ordinal = ordinal;
@@ -227,6 +229,8 @@ public abstract class Enum<E extends Enum<E>>
      *         is null
      * @since 1.5
      */
+    // 根据枚举类型和名称获取对应的枚举常量。这个方法通过调用枚举类型的enumConstantDirectory()方法来获取一个映射，
+    // 将名称映射到枚举常量。如果找到了对应的枚举常量，就返回它；如果没有找到，就抛出IllegalArgumentException异常。
     public static <T extends Enum<T>> T valueOf(Class<T> enumType,
                                                 String name) {
         T result = enumType.enumConstantDirectory().get(name);
