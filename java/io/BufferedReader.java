@@ -67,24 +67,68 @@ import java.util.stream.StreamSupport;
  * @since       JDK1.1
  */
 
+/*
+ * BufferedReader 是一个带缓冲的字符输入流，用于提高字符、数组和行的读取效率。
+ *
+ * 主要特点：
+ * 1. 内部维护一个字符缓冲区，减少对底层流的直接读取
+ * 2. 默认缓冲区大小 8192 字符，适合大多数场景
+ * 3. 支持按行读取（readLine）
+ * 4. 支持标记（mark）和重置（reset）操作
+ * 5. 适合包装 FileReader、InputStreamReader 等低效流
+ *
+ * 使用示例：
+ *   BufferedReader reader = new BufferedReader(new FileReader("test.txt"));
+ *   String line;
+ *   while ((line = reader.readLine()) != null) {
+ *       System.out.println(line);
+ *   }
+ *   reader.close();
+ */
 public class BufferedReader extends Reader {
 
+    /*
+     * 底层字符输入流，BufferedReader 的所有读取操作最终都委托给这个流
+     */
     private Reader in;
 
+    /*
+     * 字符缓冲区：用于存储从底层流读取的字符
+     * cb: 缓冲区数组
+     * nChars: 缓冲区中有效字符的数量
+     * nextChar: 下一个要读取的字符位置
+     */
     private char cb[];
     private int nChars, nextChar;
 
+    /*
+     * 标记相关常量和变量：
+     * INVALIDATED: 标记已失效（当读取超过 readAheadLimit 时）
+     * UNMARKED: 未标记状态
+     * markedChar: 标记位置（-1 表示未标记，-2 表示已失效）
+     * readAheadLimit: 标记后可读取的最大字符数（仅在 markedChar > 0 时有效）
+     */
     private static final int INVALIDATED = -2;
     private static final int UNMARKED = -1;
     private int markedChar = UNMARKED;
     private int readAheadLimit = 0; /* Valid only when markedChar > 0 */
 
+    /*
+     * 换行符处理标志：
+     * skipLF: 如果为 true，下一个 '\n' 将被跳过（用于处理 \r\n 换行符）
+     * markedSkipLF: 标记时的 skipLF 状态（用于 reset 恢复）
+     */
     /** If the next character is a line feed, skip it */
     private boolean skipLF = false;
 
     /** The skipLF flag when the mark was set */
     private boolean markedSkipLF = false;
 
+    /*
+     * 默认配置：
+     * defaultCharBufferSize: 默认缓冲区大小（8192 字符）
+     * defaultExpectedLineLength: 预期行长度（80 字符），用于优化行读取
+     */
     private static int defaultCharBufferSize = 8192;
     private static int defaultExpectedLineLength = 80;
 
@@ -96,6 +140,11 @@ public class BufferedReader extends Reader {
      * @param  sz   Input-buffer size
      *
      * @exception  IllegalArgumentException  If {@code sz <= 0}
+     */
+    /*
+     * 构造方法：创建指定缓冲区大小的 BufferedReader
+     * @param in 底层字符输入流
+     * @param sz 缓冲区大小（必须大于0）
      */
     public BufferedReader(Reader in, int sz) {
         super(in);
@@ -112,11 +161,18 @@ public class BufferedReader extends Reader {
      *
      * @param  in   A Reader
      */
+    /*
+     * 构造方法：创建使用默认缓冲区大小（8192字符）的 BufferedReader
+     * @param in 底层字符输入流
+     */
     public BufferedReader(Reader in) {
         this(in, defaultCharBufferSize);
     }
 
     /** Checks to make sure that the stream has not been closed */
+    /*
+     * 检查流是否已关闭，如果已关闭则抛出 IOException
+     */
     private void ensureOpen() throws IOException {
         if (in == null)
             throw new IOException("Stream closed");
@@ -125,27 +181,42 @@ public class BufferedReader extends Reader {
     /**
      * Fills the input buffer, taking the mark into account if it is valid.
      */
+    /*
+     * 填充输入缓冲区，如果标记有效则考虑标记位置
+     *
+     * 处理逻辑：
+     * 1. 如果没有标记：从缓冲区开头填充
+     * 2. 如果有标记：
+     *    - 如果已超过 readAheadLimit：标记失效，从头填充
+     *    - 如果缓冲区足够：将标记后的内容移到开头，继续填充
+     *    - 如果缓冲区不够：重新分配更大的缓冲区
+     */
     private void fill() throws IOException {
         int dst;
         if (markedChar <= UNMARKED) {
             /* No mark */
+            /* 没有标记 */
             dst = 0;
         } else {
             /* Marked */
+            /* 有标记 */
             int delta = nextChar - markedChar;
             if (delta >= readAheadLimit) {
                 /* Gone past read-ahead limit: Invalidate mark */
+                /* 超过预读限制：标记失效 */
                 markedChar = INVALIDATED;
                 readAheadLimit = 0;
                 dst = 0;
             } else {
                 if (readAheadLimit <= cb.length) {
                     /* Shuffle in the current buffer */
+                    /* 缓冲区足够：移动数据到开头 */
                     System.arraycopy(cb, markedChar, cb, 0, delta);
                     markedChar = 0;
                     dst = delta;
                 } else {
                     /* Reallocate buffer to accommodate read-ahead limit */
+                    /* 缓冲区不够：重新分配 */
                     char ncb[] = new char[readAheadLimit];
                     System.arraycopy(cb, markedChar, ncb, 0, delta);
                     cb = ncb;
@@ -174,6 +245,10 @@ public class BufferedReader extends Reader {
      *         end of the stream has been reached
      * @exception  IOException  If an I/O error occurs
      */
+    /*
+     * 读取单个字符
+     * @return 读取的字符（0-65535），如果到达流末尾返回 -1
+     */
     public int read() throws IOException {
         synchronized (lock) {
             ensureOpen();
@@ -199,6 +274,10 @@ public class BufferedReader extends Reader {
      * Reads characters into a portion of an array, reading from the underlying
      * stream if necessary.
      */
+    /*
+     * 读取字符到数组的一部分，必要时从底层流读取
+     * 这是内部方法，被 read(char[], int, int) 调用
+     */
     private int read1(char[] cbuf, int off, int len) throws IOException {
         if (nextChar >= nChars) {
             /* If the requested length is at least as large as the buffer, and
@@ -206,6 +285,8 @@ public class BufferedReader extends Reader {
                being skipped, do not bother to copy the characters into the
                local buffer.  In this way buffered streams will cascade
                harmlessly. */
+            /* 如果请求长度大于等于缓冲区，且没有标记，且不需要跳过换行符，
+               则直接从底层流读取，避免不必要的复制 */
             if (len >= cb.length && markedChar <= UNMARKED && !skipLF) {
                 return in.read(cbuf, off, len);
             }
@@ -273,6 +354,18 @@ public class BufferedReader extends Reader {
      *
      * @exception  IOException  If an I/O error occurs
      */
+    /*
+     * 读取字符到数组的一部分
+     * 会尝试尽可能多地读取字符，直到以下条件之一满足：
+     * 1. 读取了指定数量的字符
+     * 2. 底层流返回 -1（到达文件末尾）
+     * 3. 底层流的 ready() 返回 false（会阻塞）
+     *
+     * @param cbuf 目标缓冲区
+     * @param off 起始偏移量
+     * @param len 最大读取字符数
+     * @return 实际读取的字符数，到达流末尾返回 -1
+     */
     public int read(char cbuf[], int off, int len) throws IOException {
         synchronized (lock) {
             ensureOpen();
@@ -308,6 +401,21 @@ public class BufferedReader extends Reader {
      * @see        java.io.LineNumberReader#readLine()
      *
      * @exception  IOException  If an I/O error occurs
+     */
+    /*
+     * 读取一行文本。行终止符可以是以下任意一种：
+     * - 换行符 '\n'
+     * - 回车符 '\r'
+     * - 回车符后紧跟换行符 '\r\n'
+     *
+     * @param ignoreLF 如果为 true，下一个 '\n' 将被跳过
+     *
+     * @return 包含行内容的字符串，不包含行终止符；
+     *         如果到达流末尾则返回 null
+     *
+     * @see java.io.LineNumberReader#readLine()
+     *
+     * @throws IOException 如果发生 I/O 错误
      */
     String readLine(boolean ignoreLF) throws IOException {
         StringBuffer s = null;
