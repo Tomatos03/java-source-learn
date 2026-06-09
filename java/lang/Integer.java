@@ -776,14 +776,23 @@ public final class Integer extends Number implements Comparable<Integer> {
      * may be set and saved in the private system properties in the
      * sun.misc.VM class.
      */
-
+    /*
+     * 缓存，用于支持 -128 到 127（含）之间值的自动装箱对象语义，这是 JLS 的要求。
+     *
+     * 缓存在首次使用时初始化。缓存的大小可以通过 -XX:AutoBoxCacheMax=<size> 选项来控制。
+     * 在 VM 初始化期间，java.lang.Integer.IntegerCache.high 属性可以被设置，
+     * 并保存在 sun.misc.VM 类的私有系统属性中。
+     *
+     * 只有Integer这个基本数据类支持动态配置上界，其他基本数据类型包装类无法配置.
+     */
     private static class IntegerCache {
-        static final int low = -128;
-        static final int high;
-        static final Integer cache[];
+        static final int low = -128;    // 缓存范围的下界（含）
+        static final int high;          // 缓存范围的上界（含），可通过 JVM 参数配置
+        static final Integer cache[];   // 缓存的 Integer 对象数组
 
         static {
             // high value may be configured by property
+            // 上界值可以通过属性配置
             int h = 127;
             String integerCacheHighPropValue =
                 sun.misc.VM.getSavedProperty("java.lang.Integer.IntegerCache.high");
@@ -792,19 +801,24 @@ public final class Integer extends Number implements Comparable<Integer> {
                     int i = parseInt(integerCacheHighPropValue);
                     i = Math.max(i, 127);
                     // Maximum array size is Integer.MAX_VALUE
+                    // 数组最大长度为 Integer.MAX_VALUE
                     h = Math.min(i, Integer.MAX_VALUE - (-low) -1);
                 } catch( NumberFormatException nfe) {
                     // If the property cannot be parsed into an int, ignore it.
+                    // 如果属性值无法解析为 int，则忽略它。
                 }
             }
             high = h;
 
+            // 创建缓存数组，大小为 high - low + 1
             cache = new Integer[(high - low) + 1];
             int j = low;
+            // 预先创建所有缓存范围内的 Integer 对象
             for(int k = 0; k < cache.length; k++)
                 cache[k] = new Integer(j++);
 
             // range [-128, 127] must be interned (JLS7 5.1.7)
+            // JLS 7 规范 5.1.7 要求：[-128, 127] 范围必须被缓存
             assert IntegerCache.high >= 127;
         }
 
@@ -1230,6 +1244,10 @@ public final class Integer extends Number implements Comparable<Integer> {
      *         a value greater than {@code 0} if {@code x > y}
      * @since 1.7
      */
+    // x, y进行比较
+    // x = y -> 0
+    // x < y -> -1
+    // x > y -> 1
     public static int compare(int x, int y) {
         return (x < y) ? -1 : ((x == y) ? 0 : 1);
     }
@@ -1246,6 +1264,21 @@ public final class Integer extends Number implements Comparable<Integer> {
      *         unsigned values
      * @since 1.8
      */
+    // 比较x、y看作无符号后的大小
+    //
+    // 有符号：
+    // 01111111111111111111111111111111  =  2147483647  (最大正数，MAX_VALUE)
+    // 00000000000000000000000000000001  =  1
+    // 00000000000000000000000000000000  =  0
+    // 11111111111111111111111111111111  =  -1
+    // 10000000000000000000000000000000  =  -2147483648 (最小负数，MIN_VALUE)
+    //
+    // 无符号：
+    //01111111111111111111111111111111  =  2147483647
+    // 00000000000000000000000000000001  =  1
+    // 00000000000000000000000000000000  =  0
+    // 11111111111111111111111111111111  =  4294967295  (最大无符号数)
+    // 10000000000000000000000000000000  =  2147483648
     public static int compareUnsigned(int x, int y) {
         return compare(x + MIN_VALUE, y + MIN_VALUE);
     }
