@@ -53,6 +53,33 @@ import java.nio.charset.UnsupportedCharsetException;
  * @since       JDK1.1
  */
 
+/*
+ * PrintWriter 是一个字符输出流，用于将格式化的对象表示打印到文本输出流。
+ *
+ * 主要特点：
+ * 1. 继承自 Writer，是字符流（不是字节流）
+ * 2. 实现了 PrintStream 中的所有 print 方法
+ * 3. 支持自动刷新：仅在调用 println、printf 或 format 方法时触发
+ * 4. 使用平台的行分隔符（而不是换行符 \n）
+ * 5. 方法不会抛出 I/O 异常，可通过 checkError() 检查错误
+ *
+ * 与 PrintStream 的区别：
+ * - PrintWriter 是字符流，PrintStream 是字节流
+ * - PrintWriter 的自动刷新只在 println/printf/format 时触发
+ * - PrintWriter 更适合处理文本输出
+ *
+ * 常见用途：
+ * - 文件写入
+ * - 网络输出
+ * - Servlet 响应输出
+ * - 日志记录
+ *
+ * 使用示例：
+ *   PrintWriter writer = new PrintWriter(new FileWriter("output.txt"));
+ *   writer.println("Hello, World!");
+ *   writer.printf("Name: %s, Age: %d", "Alice", 25);
+ *   writer.close();
+ */
 public class PrintWriter extends Writer {
 
     /**
@@ -61,16 +88,38 @@ public class PrintWriter extends Writer {
      *
      * @since 1.2
      */
+    /*
+     * 底层字符输出流，PrintWriter 的所有写入操作最终都委托给这个流
+     */
     protected Writer out;
 
+    /*
+     * 自动刷新标志：为 true 时，每次调用 println/printf/format 后自动刷新
+     */
     private final boolean autoFlush;
+
+    /*
+     * 错误标志：当发生 I/O 异常时设置为 true，不会抛出异常
+     */
     private boolean trouble = false;
+
+    /*
+     * 格式化器：用于 printf 和 format 方法的格式化输出
+     */
     private Formatter formatter;
+
+    /*
+     * PrintStream 输出：用于 System.out 等场景
+     */
     private PrintStream psOut = null;
 
     /**
      * Line separator string.  This is the value of the line.separator
      * property at the moment that the stream was created.
+     */
+    /*
+     * 行分隔符：在流创建时从系统属性 line.separator 获取
+     * Windows: \r\n, Linux/Mac: \n
      */
     private final String lineSeparator;
 
@@ -96,6 +145,10 @@ public class PrintWriter extends Writer {
      *
      * @param  out        A character-output stream
      */
+    /*
+     * 构造方法：创建一个不自动刷新的 PrintWriter
+     * @param out 字符输出流
+     */
     public PrintWriter (Writer out) {
         this(out, false);
     }
@@ -107,6 +160,11 @@ public class PrintWriter extends Writer {
      * @param  autoFlush  A boolean; if true, the <tt>println</tt>,
      *                    <tt>printf</tt>, or <tt>format</tt> methods will
      *                    flush the output buffer
+     */
+    /*
+     * 构造方法：创建一个 PrintWriter
+     * @param out 字符输出流
+     * @param autoFlush 是否自动刷新：true 时，println/printf/format 会自动刷新
      */
     public PrintWriter(Writer out,
                        boolean autoFlush) {
@@ -127,6 +185,11 @@ public class PrintWriter extends Writer {
      *
      * @see java.io.OutputStreamWriter#OutputStreamWriter(java.io.OutputStream)
      */
+    /*
+     * 构造方法：从 OutputStream 创建不自动刷新的 PrintWriter
+     * 内部会创建 OutputStreamWriter 进行字节到字符的转换
+     * @param out 字节输出流
+     */
     public PrintWriter(OutputStream out) {
         this(out, false);
     }
@@ -143,6 +206,13 @@ public class PrintWriter extends Writer {
      *                    flush the output buffer
      *
      * @see java.io.OutputStreamWriter#OutputStreamWriter(java.io.OutputStream)
+     */
+    /*
+     * 构造方法：从 OutputStream 创建 PrintWriter
+     * 内部会创建 OutputStreamWriter + BufferedWriter 进行缓冲
+     * 如果 out 是 PrintStream，会保存引用用于错误传播
+     * @param out 字节输出流
+     * @param autoFlush 是否自动刷新
      */
     public PrintWriter(OutputStream out, boolean autoFlush) {
         this(new BufferedWriter(new OutputStreamWriter(out)), autoFlush);
@@ -180,12 +250,17 @@ public class PrintWriter extends Writer {
      *
      * @since  1.5
      */
+    /*
+     * 构造方法：从文件名创建不自动刷新的 PrintWriter
+     * 使用平台默认字符集，如果文件存在则清空，不存在则创建
+     * @param fileName 文件名
+     */
     public PrintWriter(String fileName) throws FileNotFoundException {
         this(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName))),
              false);
     }
 
-    /* Private constructor */
+    /* 私有构造方法：从字符集和文件创建 PrintWriter */
     private PrintWriter(Charset charset, File file)
         throws FileNotFoundException
     {
@@ -226,6 +301,11 @@ public class PrintWriter extends Writer {
      *
      * @since  1.5
      */
+    /*
+     * 构造方法：从文件名和字符集创建不自动刷新的 PrintWriter
+     * @param fileName 文件名
+     * @param csn 字符集名称（如 "UTF-8", "GBK"）
+     */
     public PrintWriter(String fileName, String csn)
         throws FileNotFoundException, UnsupportedEncodingException
     {
@@ -258,6 +338,11 @@ public class PrintWriter extends Writer {
      *          denies write access to the file
      *
      * @since  1.5
+     */
+    /*
+     * 构造方法：从 File 对象创建不自动刷新的 PrintWriter
+     * 使用平台默认字符集
+     * @param file 文件对象
      */
     public PrintWriter(File file) throws FileNotFoundException {
         this(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file))),
@@ -297,6 +382,11 @@ public class PrintWriter extends Writer {
      *
      * @since  1.5
      */
+    /*
+     * 构造方法：从 File 对象和字符集创建不自动刷新的 PrintWriter
+     * @param file 文件对象
+     * @param csn 字符集名称
+     */
     public PrintWriter(File file, String csn)
         throws FileNotFoundException, UnsupportedEncodingException
     {
@@ -304,6 +394,9 @@ public class PrintWriter extends Writer {
     }
 
     /** Checks to make sure that the stream has not been closed */
+    /*
+     * 检查流是否已关闭，如果已关闭则抛出 IOException
+     */
     private void ensureOpen() throws IOException {
         if (out == null)
             throw new IOException("Stream closed");
@@ -312,6 +405,10 @@ public class PrintWriter extends Writer {
     /**
      * Flushes the stream.
      * @see #checkError()
+     */
+    /*
+     * 刷新流：将缓冲区的数据强制写入底层流
+     * 如果发生异常，设置 trouble 标志而不抛出异常
      */
     public void flush() {
         try {
@@ -330,6 +427,10 @@ public class PrintWriter extends Writer {
      * with it. Closing a previously closed stream has no effect.
      *
      * @see #checkError()
+     */
+    /*
+     * 关闭流并释放相关系统资源
+     * 关闭已关闭的流不会产生任何效果
      */
     public void close() {
         try {
@@ -352,6 +453,11 @@ public class PrintWriter extends Writer {
      *          either on the underlying output stream or during a format
      *          conversion.
      */
+    /*
+     * 检查流是否发生错误
+     * 先刷新流，然后检查错误状态
+     * @return true 表示发生了 I/O 错误
+     */
     public boolean checkError() {
         if (out != null) {
             flush();
@@ -372,6 +478,10 @@ public class PrintWriter extends Writer {
      * #checkError()} to return <tt>true</tt> until {@link
      * #clearError()} is invoked.
      */
+    /*
+     * 设置错误标志：标记发生了错误
+     * 后续调用 checkError() 将返回 true
+     */
     protected void setError() {
         trouble = true;
     }
@@ -385,18 +495,26 @@ public class PrintWriter extends Writer {
      *
      * @since 1.6
      */
+    /*
+     * 清除错误标志：重置错误状态
+     * 后续调用 checkError() 将返回 false，直到再次发生错误
+     */
     protected void clearError() {
         trouble = false;
     }
 
     /*
-     * Exception-catching, synchronized output operations,
-     * which also implement the write() methods of Writer
+     * 以下方法实现了 Writer 的 write() 方法
+     * 所有写入操作都是同步的，并捕获 I/O 异常
      */
 
     /**
      * Writes a single character.
      * @param c int specifying a character to be written.
+     */
+    /*
+     * 写入单个字符
+     * @param c 要写入的字符（int 类型）
      */
     public void write(int c) {
         try {
@@ -419,6 +537,12 @@ public class PrintWriter extends Writer {
      * @param off Offset from which to start writing characters
      * @param len Number of characters to write
      */
+    /*
+     * 写入字符数组的一部分
+     * @param buf 字符数组
+     * @param off 起始偏移量
+     * @param len 要写入的字符数
+     */
     public void write(char buf[], int off, int len) {
         try {
             synchronized (lock) {
@@ -439,6 +563,10 @@ public class PrintWriter extends Writer {
      * Writer class because it must suppress I/O exceptions.
      * @param buf Array of characters to be written
      */
+    /*
+     * 写入整个字符数组
+     * @param buf 字符数组
+     */
     public void write(char buf[]) {
         write(buf, 0, buf.length);
     }
@@ -448,6 +576,12 @@ public class PrintWriter extends Writer {
      * @param s A String
      * @param off Offset from which to start writing characters
      * @param len Number of characters to write
+     */
+    /*
+     * 写入字符串的一部分
+     * @param s 字符串
+     * @param off 起始偏移量
+     * @param len 要写入的字符数
      */
     public void write(String s, int off, int len) {
         try {
@@ -469,10 +603,18 @@ public class PrintWriter extends Writer {
      * because it must suppress I/O exceptions.
      * @param s String to be written
      */
+    /*
+     * 写入整个字符串
+     * @param s 字符串
+     */
     public void write(String s) {
         write(s, 0, s.length());
     }
 
+    /*
+     * 写入行分隔符（如 \r\n 或 \n）
+     * 如果 autoFlush 为 true，写入后自动刷新
+     */
     private void newLine() {
         try {
             synchronized (lock) {
