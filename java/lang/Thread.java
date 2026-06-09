@@ -1235,6 +1235,20 @@ class Thread implements Runnable {
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
      */
+    /*
+     * 最多等待 millis 毫秒，让此线程终止。超时时间为 0 表示永远等待。
+     *
+     * 此实现使用一个循环，反复调用 this.wait，条件是 this.isAlive。
+     * 当线程终止时，会调用 this.notifyAll 方法。
+     * 建议应用程序不要在线程实例上使用 wait、notify 或 notifyAll。
+     *
+     * @param millis 等待的时间，以毫秒为单位
+     *
+     * @throws IllegalArgumentException 如果 millis 的值为负数
+     *
+     * @throws InterruptedException 如果任何线程中断了当前线程。
+     *         当抛出此异常时，当前线程的中断状态将被清除。
+     */
     public final synchronized void join(long millis)
     throws InterruptedException {
         long base = System.currentTimeMillis();
@@ -1285,6 +1299,21 @@ class Thread implements Runnable {
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
      */
+    /*
+     * 最多等待 millis 毫秒加上 nanos 纳秒，让此线程终止。
+     *
+     * 此实现使用一个循环，反复调用 this.wait，条件是 this.isAlive。
+     * 当线程终止时，会调用 this.notifyAll 方法。
+     * 建议应用程序不要在线程实例上使用 wait、notify 或 notifyAll。
+     *
+     * @param millis 等待的时间，以毫秒为单位
+     * @param nanos 额外等待的纳秒数，范围 0-999999
+     *
+     * @throws IllegalArgumentException 如果 millis 的值为负数，或 nanos 不在 0-999999 范围内
+     *
+     * @throws InterruptedException 如果任何线程中断了当前线程。
+     *         当抛出此异常时，当前线程的中断状态将被清除。
+     */
     public final synchronized void join(long millis, int nanos)
     throws InterruptedException {
 
@@ -1318,6 +1347,23 @@ class Thread implements Runnable {
      *          if any thread has interrupted the current thread. The
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
+     */
+    /*
+     * 等待此线程终止。
+     *
+     * 调用此方法的行为与调用 join(0) 完全相同。
+     *
+     * 使用示例:
+     *   Thread worker = new Thread(() -> {
+     *       // 执行耗时任务
+     *       System.out.println("任务完成");
+     *   });
+     *   worker.start();
+     *   worker.join();  // 主线程main等待 worker 线程执行完毕
+     *   System.out.println("所有任务已完成");
+     *
+     * @throws InterruptedException 如果任何线程中断了当前线程。
+     *         当抛出此异常时，当前线程的中断状态将被清除。
      */
     public final void join() throws InterruptedException {
         join(0);
