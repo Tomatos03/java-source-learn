@@ -612,6 +612,21 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
          * Creates with given first task and thread from ThreadFactory.
          * @param firstTask the first task (null if none)
          */
+        /*
+         * Worker 是 ThreadPoolExecutor 的内部类，它同时实现了 Runnable 和独占锁。
+         *
+         * 设计要点：
+         * 1. Worker 本身就是 Runnable，它持有的 thread 线程启动后会执行 Worker.run()
+         * 2. Worker 继承了 AQS（AbstractQueuedSynchronizer），实现了一个简单的独占锁：
+         *    - 用于标识线程是否正在执行任务（lock 表示正在执行，unlock 表示空闲）
+         *    - interruptIdleWorkers() 通过 tryLock() 判断线程是否空闲，只中断空闲线程
+         * 3. firstTask 是创建 Worker 时绑定的第一个任务，可以为 null
+         * 4. thread 是通过 ThreadFactory 创建的实际线程，执行 Worker.run() -> runWorker()
+         *
+         * setState(-1) 的作用：
+         *   设置 AQS 状态为 -1，防止线程在 runWorker() 被调用前被中断。
+         *   runWorker() 开头会调用 w.unlock() 将状态改为 0，解除中断抑制。
+         */
         Worker(Runnable firstTask) {
             setState(-1); // inhibit interrupts until runWorker
             this.firstTask = firstTask;
@@ -904,6 +919,31 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
       * 3. 对于核心线程数量不超过核心线程数, 对于非核心线程数量不超过最大线程数 - 核心线程数
       */
      private boolean addWorker(Runnable firstTask, boolean core) {
+        /*
+         * addWorker() 方法负责实际创建一个新的工作线程（Worker）并启动它。
+         *
+         * 参数说明：
+         *   - firstTask：新线程的第一个任务，可以为 null（表示只从队列取任务）
+         *   - core：true 表示创建核心线程（上限为 corePoolSize），
+         *           false 表示创建非核心线程（上限为 maximumPoolSize）
+         *
+         * 执行流程：
+         * 1. 外层自旋 + CAS 增加 worker 计数：
+         *    - 如果线程池已关闭（STOP/TIDYING/TERMINATED），直接返回 false
+         *    - 如果是 SHUTDOWN 状态且 firstTask 不为 null 或队列为空，也返回 false
+         *      （SHUTDOWN 状态下只允许创建 firstTask=null 的线程来消费队列中的剩余任务）
+         *    - 根据 core 参数判断上限：core=true 比较 corePoolSize，否则比较 maximumPoolSize
+         *    - CAS 成功则跳出循环，表示已"预占"一个线程名额
+         *
+         * 2. 创建 Worker 对象（内部通过 ThreadFactory 创建线程）
+         *
+         * 3. 加锁后将 Worker 添加到 workers 集合（HashSet），然后启动线程
+         *    - 启动后线程会执行 Worker.run() -> runWorker()，开始主循环
+         *
+         * 4. 如果启动失败，调用 addWorkerFailed() 回滚：从 workers 移除并减少 worker 计数
+         *
+         * 返回值：true 表示线程创建并启动成功，false 表示失败
+         */
         retry:
         for (;;) {
             int c = ctl.get();
@@ -985,6 +1025,12 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      *   worker was holding up termination
      */
     private void addWorkerFailed(Worker w) {
+        /*
+         * addWorkerFailed() 在 Worker 创建或启动失败时调用，用于回滚 addWorker 中的操作：
+         * 1. 从 workers 集合中移除该 Worker（如果已添加）
+         * 2. 减少 worker 计数（因为 addWorker 入口处已经 CAS 增加了）
+         * 3. 尝试终止线程池（如果线程池正在关闭且没有其他 Worker）
+         */
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
@@ -1056,6 +1102,30 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      *         workerCount is decremented
      */
     private Runnable getTask() {
+        /*
+         * getTask() 是工作线程从队列中获取任务的方法，是区分核心线程和非核心线程的关键。
+         *
+         * 超时淘汰机制：
+         *   boolean timed = allowCoreThreadTimeOut || wc > corePoolSize;
+         *   - allowCoreThreadTimeOut 默认为 false，此时：
+         *     · 当前线程数 <= corePoolSize 时，timed = false（核心线程不超时）
+         *     · 当前线程数 > corePoolSize 时，timed = true（非核心线程会超时）
+         *   - 如果设置了 allowCoreThreadTimeOut(true)，则所有线程都会超时
+         *
+         * 取任务的方式：
+         *   - timed = true  → workQueue.poll(keepAliveTime, NANOSECONDS)：超时等待
+         *     超时未获取到任务则 timedOut = true，下一轮循环时 compareAndDecrementWorkerCount
+         *     减少线程数并返回 null，线程退出
+         *   - timed = false → workQueue.take()：无限期阻塞等待，直到有任务到来
+         *     核心线程默认使用这种方式，所以永远不会因超时而退出
+         *
+         * 线程退出条件（同时满足）：
+         *   1. timed == true（超时的线程）
+         *   2. 上一次 poll() 超时了（timedOut == true）
+         *   3. 线程数 > 1 或 队列为空（确保至少保留一个线程来消费队列， 或任务队列中没有任何需要执行的任务）
+         *
+         * 这就是为什么非核心线程在空闲 keepAliveTime 后会被回收的原因。
+         */
         boolean timedOut = false; // Did the last poll() time out?
 
         for (;;) {
@@ -1137,6 +1207,27 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * @param w the worker
      */
     final void runWorker(Worker w) {
+        /*
+         * runWorker() 是工作线程的主循环方法，每个 Worker 线程启动后都会进入这里。
+         *
+         * 核心逻辑：
+         * 1. 先执行 Worker 创建时绑定的 firstTask（如果有）
+         * 2. firstTask 执行完毕后，循环调用 getTask() 从工作队列中获取新任务
+         * 3. 获取到任务就执行，getTask() 返回 null 则退出循环，线程结束
+         *
+         * 线程复用：
+         *   while (task != null || (task = getTask()) != null) 这个循环使得一个 Worker
+         *   线程可以反复执行多个任务，而不是执行完一个就销毁。"复用"发生在 getTask() 的
+         *   阻塞等待中——线程在此处挂起，有新任务到来时被唤醒继续执行。
+         *
+         * 线程退出的时机：
+         *   当 getTask() 返回 null 时退出循环，可能的原因：
+         *   - 线程池已关闭（SHUTDOWN 且队列为空，或 STOP 状态）
+         *   - 线程数超过 maximumPoolSize
+         *   - 非核心线程在 keepAliveTime 时间内没有获取到任务（超时淘汰）
+         *   退出后会调用 processWorkerExit() 清理该 Worker
+         */
+        Thread wt = Thread.currentThread();
         Thread wt = Thread.currentThread();
         Runnable task = w.firstTask;
         w.firstTask = null;
@@ -1371,22 +1462,52 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
          * thread.  If it fails, we know we are shut down or saturated
          * and so reject the task.
          */
-        // ctl维护了线程池的“运行状态”与“工作线程数”
+        /*
+         * 核心线程 vs 非核心线程的区别：
+         *   - addWorker(command, true)  —— 核心线程，受 corePoolSize 上限限制
+         *   - addWorker(command, false) —— 非核心线程，受 maximumPoolSize 上限限制
+         *   非核心线程在 getTask() 中通过超时等待 (poll) 从队列取任务，
+         *   超时未取到任务则自动退出销毁；核心线程默认使用 take() 阻塞等待，永不超时。
+         */
+        // ctl维护了线程池的”运行状态”与”工作线程数”
         int c = ctl.get(); // ctl: AutomicInteger
-        // 优先创建核心线程, 然后才创建非核心线程
+        /*
+         * 如果当前运行的线程数 < corePoolSize，则调用 addWorker(command, true)
+         * 创建一个新的”核心线程”来执行该任务。addWorker 内部会通过 CAS 原子操作
+         * 检查运行状态和线程数，防止并发情况下误创建线程。
+         * 即使有空闲的核心线程，只要数量未达到 corePoolSize，也会创建新核心线程，
+         * 而不是复用已有的空闲线程——这是”核心线程不会被回收”特性的根源。
+         *
+         */
         if (workerCountOf(c) < corePoolSize) {
             if (addWorker(command, true))
                 return;
             c = ctl.get();
         }
-        // workQueue.offer()返回false, 表示队列已满
+        /**
+         * isRunning(c)判断线程池是否还处于运行状态而不是已经关闭
+         * workQueue.offer()是一个非阻塞操作， 任务成功添加到队列时返回true，否则返回false, 表示队列已满。
+         *
+         * 核心线程数已满，但队列还有空间。任务被放入队列等待核心线程空闲后消费。
+         */
         if (isRunning(c) && workQueue.offer(command)) {
             int recheck = ctl.get();
+           /*
+            * - 如果线程池已停止，回滚入队操作并拒绝任务
+            * - 如果当前没有任何工作线程（workerCount == 0），则创建一个非核心线程
+            *   来处理队列中的任务（传入 firstTask 为 null，表示从队列取任务）
+            *
+            */
             if (!isRunning(recheck) && remove(command))
-                reject(command);
+                reject(command); // 调用拒绝策略
             else if (workerCountOf(recheck) == 0)
                 addWorker(null, false);
         }
+        /**
+         *
+         *   如果任务队列已满，则尝试调用 addWorker(command, false)
+         *   创建一个”非核心线程”来执行该任务。
+         */
         else if (!addWorker(command, false))
         /**
          * 失败策略调用时机:
