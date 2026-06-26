@@ -1794,10 +1794,13 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
             if (tab == null || (n = tab.length) == 0)
                 tab = initTable();
             else if ((f = tabAt(tab, i = (n - 1) & h)) == null) {
-                // 对应的hash表桶位置是null, 尝试cas插入一个占位节点ReservationNode
-                // ReservationNode：computeIfAbsent/compute 中使用的临时占位节点
-                // 作用：先占住桶位，避免并发线程重复计算 mappingFunction
-                // 其他线程看到该占位节点会被阻塞或重试，直到计算完成并替换为真实节点
+                /**
+                 * 由于mappingFunction.apply(key)执行时间的不确定性, 如果和putVal()方法一样
+                 * 通过cas的方式创建桶节点, 可能会产生大量的重试, 造成性能的下降. 利用预占位节点
+                 * 的方式, 让多个线程创建预占位节点(只有一个线程能够成功将预占位节点放入桶中), 将
+                 * 预占位节点放到桶中失败的节点阻塞等待(synchronized尝试获取锁失败阻塞等待),此时
+                 *
+                 */
                 Node<K,V> r = new ReservationNode<K,V>();
                 /*
                  * synchronized(r) 的目的：不是为了互斥而是为了让占位节点r在被CAS放入table后，其他线程能通过 synchronized(f) 等待。
@@ -1823,7 +1826,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                  *                                 回到for循环，再次判断...
                  *                                 此时table[i] = rA（不是null，也不是MOVED）
                  *                                 进入 else 分支（第1823行）
-                 *                                 synchronized(rA) { ← 等待线程A释放rA的锁
+                 *                                 synchronized(f) { ← 等待线程A释放rA的锁
                  *   mappingFunction完成
                  *   setTabAt(tab, i, node)
                  *   synchronized(rA) 释放锁
